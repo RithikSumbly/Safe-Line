@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, Response
 
 from app.config import get_settings
 from app.whatsapp.pipeline import InboundMessage, Messenger, handle_inbound
@@ -127,9 +127,9 @@ def _extract_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 @router.get("/webhook")
 async def verify_webhook(
-    hub_mode: str | None = None,
-    hub_verify_token: str | None = None,
-    hub_challenge: str | None = None,
+    hub_mode: str | None = Query(default=None, alias="hub.mode"),
+    hub_verify_token: str | None = Query(default=None, alias="hub.verify_token"),
+    hub_challenge: str | None = Query(default=None, alias="hub.challenge"),
 ):
     settings = get_settings()
     if hub_mode == "subscribe" and hub_verify_token == settings.meta_verify_token:
