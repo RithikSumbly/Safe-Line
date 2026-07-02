@@ -27,10 +27,15 @@ AGENTS: dict[AgentType, object] = {
 
 app = FastAPI(title="SafeLine Agent Service", version="1.0.0")
 settings = get_settings()
+allow_credentials = True
+if "*" in settings.cors_origin_list:
+    # CORS spec disallows `Access-Control-Allow-Credentials: true` with wildcard origins.
+    # This API is tokenless/cookie-less, so credentials are not required.
+    allow_credentials = False
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
-    allow_credentials=True,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
