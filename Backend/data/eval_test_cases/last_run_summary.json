@@ -1,0 +1,110 @@
+[
+  {
+    "agent": "scam",
+    "total": 3,
+    "accuracy": 1.0,
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.0,
+    "results": [
+      {
+        "id": "scam_01",
+        "expected": "high_risk",
+        "actual": "medium_risk",
+        "correct": true
+      },
+      {
+        "id": "scam_02",
+        "expected": "high_risk",
+        "actual": "medium_risk",
+        "correct": true
+      },
+      {
+        "id": "scam_03",
+        "expected": "high_risk",
+        "actual": "medium_risk",
+        "correct": true
+      }
+    ]
+  },
+  {
+    "agent": "job_offer",
+    "total": 3,
+    "accuracy": 1.0,
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.0,
+    "results": [
+      {
+        "id": "job_01",
+        "expected": "high_risk",
+        "actual": "high_risk",
+        "correct": true
+      },
+      {
+        "id": "job_02",
+        "expected": "high_risk",
+        "actual": "high_risk",
+        "correct": true
+      },
+      {
+        "id": "job_03",
+        "expected": "high_risk",
+        "actual": "high_risk",
+        "correct": true
+      }
+    ]
+  },
+  {
+    "agent": "crisis_rumor",
+    "total": 3,
+    "accuracy": 0.667,
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.333,
+    "results": [
+      {
+        "id": "crisis_01",
+        "expected": "unverified",
+        "actual": "unverified",
+        "correct": true
+      },
+      {
+        "id": "crisis_02",
+        "expected": "unverified",
+        "actual": "unverified",
+        "correct": true
+      },
+      {
+        "id": "crisis_03",
+        "expected": "likely_false",
+        "actual": "unverified",
+        "correct": false
+      }
+    ]
+  },
+  {
+    "agent": "rental_redflag",
+    "total": 3,
+    "accuracy": 1.0,
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.0,
+    "results": [
+      {
+        "id": "rental_01",
+        "expected": "high_risk",
+        "actual": "high_risk",
+        "correct": true
+      },
+      {
+        "id": "rental_02",
+        "expected": "high_risk",
+        "actual": "medium_risk",
+        "correct": true
+      },
+      {
+        "id": "rental_03",
+        "expected": "low_risk",
+        "actual": "low_risk",
+        "correct": true
+      }
+    ]
+  }
+]

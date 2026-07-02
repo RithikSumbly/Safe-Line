@@ -1,0 +1,15 @@
+{"id": "crisis_01", "text": "URGENT: Dam cracks. City will flood tonight. Evacuate immediately. Govt hiding truth.", "location": "Ernakulam", "expected_status": "unverified"}
+{"id": "crisis_02", "text": "Schools closed tomorrow statewide due to cyclone warning.", "location": "Kerala", "expected_status": "unverified"}
+{"id": "crisis_03", "text": "Earthquake 7.2 hit Mumbai just now. Buildings collapsing.", "location": "Mumbai", "expected_status": "likely_false"}
+{"id": "crisis_04", "text": "Water supply contaminated. Do not drink tap water for 48 hours.", "location": "Delhi", "expected_status": "unverified"}
+{"id": "crisis_05", "text": "Old 2018 Kerala flood video re-shared as happening now in Chennai.", "location": "Chennai", "expected_status": "outdated"}
+{"id": "crisis_06", "text": "Exam paper leaked for NEET. Download from telegram.", "location": "India", "expected_status": "likely_false"}
+{"id": "crisis_07", "text": "Riots starting in city center. Stay indoors.", "location": "Bengaluru", "expected_status": "unverified"}
+{"id": "crisis_08", "text": "IMD issued yellow alert for heavy rain in Thiruvananthapuram district.", "location": "Thiruvananthapuram", "expected_status": "confirmed"}
+{"id": "crisis_09", "text": "Bridge collapse in unrelated state forwarded as local emergency.", "location": "Kochi", "expected_status": "outdated"}
+{"id": "crisis_10", "text": "Share this message before they delete it. Virus outbreak at local hospital.", "location": "Kozhikode", "expected_status": "unverified"}
+{"id": "crisis_11", "text": "Traffic diversion on NH bypass due to maintenance tomorrow 9am-5pm.", "location": "Kerala", "expected_status": "likely_safe"}
+{"id": "crisis_12", "text": "Wildfire spreading to residential area evacuate now!!!", "location": "Himachal Pradesh", "expected_status": "unverified"}
+{"id": "crisis_13", "text": "Government announced holiday for festival on Monday.", "location": "India", "expected_status": "confirmed"}
+{"id": "crisis_14", "text": "Tsunami warning for entire east coast in 30 minutes.", "location": "Chennai", "expected_status": "likely_false"}
+{"id": "crisis_15", "text": "Power outage scheduled in sector 4 for grid maintenance 2-4pm.", "location": "Kochi", "expected_status": "likely_safe"}

@@ -1,0 +1,15 @@
+{"id": "job_01", "text": "Pay ₹499 registration fee via UPI for Amazon data entry job. hr.amazon-hiring@gmail.com", "expected_status": "high_risk"}
+{"id": "job_02", "text": "Selected without interview. Send training kit fee ₹1999 to confirm offer.", "expected_status": "high_risk"}
+{"id": "job_03", "text": "Work from home. Pay security deposit before onboarding.", "expected_status": "high_risk"}
+{"id": "job_04", "text": "Google hiring. Verify identity with ₹50 processing charge.", "expected_status": "high_risk"}
+{"id": "job_05", "text": "Urgent hiring for courier role. Pay uniform fee upfront.", "expected_status": "high_risk"}
+{"id": "job_06", "text": "Congratulations! Remote role at unknown-startup.xyz. Fee for background check.", "expected_status": "high_risk"}
+{"id": "job_07", "text": "HR from microsoft-careers-team@outlook.com asks for bank details before interview.", "expected_status": "medium_risk"}
+{"id": "job_08", "text": "Legitimate recruiter from known company requests resume for scheduled interview next week.", "expected_status": "low_risk"}
+{"id": "job_09", "text": "Internship offer with stipend, no fees, official company portal link careers.tcs.com", "expected_status": "likely_safe"}
+{"id": "job_10", "text": "Reply YES to accept mystery shopper job paying ₹5000/day with upfront kit cost.", "expected_status": "high_risk"}
+{"id": "job_11", "text": "Freelance project inquiry with milestone payment, no registration fee.", "expected_status": "low_risk"}
+{"id": "job_12", "text": "Data entry job. Pay ₹299 for software license before work.", "expected_status": "high_risk"}
+{"id": "job_13", "text": "Interview invitation from verified LinkedIn recruiter for onsite role.", "expected_status": "likely_safe"}
+{"id": "job_14", "text": "Immediate joining bonus if you pay document verification fee today.", "expected_status": "high_risk"}
+{"id": "job_15", "text": "Campus placement shortlist. Report to official college placement cell.", "expected_status": "likely_safe"}
