@@ -23,7 +23,6 @@ class ParsedCommand(BaseModel):
         "SCAM",
         "JOB",
         "CRISIS",
-        "RENTAL",
         "HELP",
         "MENU",
         "CHECK",
@@ -37,10 +36,9 @@ COMMAND_AGENT: dict[str, AgentType] = {
     "SCAM": "scam",
     "JOB": "job_offer",
     "CRISIS": "crisis_rumor",
-    "RENTAL": "rental_redflag",
 }
 
-_CMD_RE = re.compile(r"(?i)^\s*(scam|job|crisis|rental|help|menu|check|done|go)\b")
+_CMD_RE = re.compile(r"(?i)^\s*(scam|job|crisis|help|menu|check|done|go)\b")
 
 
 def parse_command(text: str) -> Optional[ParsedCommand]:
@@ -89,11 +87,11 @@ async def classify_message(text: str) -> MessageClassification:
                 "You are a WhatsApp message router for SafeLine.\n"
                 "Return strict JSON with:\n"
                 '- mode: \"chitchat\" | \"command\" | \"content_check\"\n'
-                '- agent_guess: \"scam\" | \"job_offer\" | \"crisis_rumor\" | \"rental_redflag\" | null\n'
+                '- agent_guess: \"scam\" | \"job_offer\" | \"crisis_rumor\" | null\n'
                 "- confidence: number 0..1\n\n"
                 "Rules:\n"
                 "- If user is greeting or asking capabilities -> chitchat.\n"
-                "- If user explicitly typed one of: SCAM/JOB/CRISIS/RENTAL/HELP/MENU/CHECK/DONE/GO -> command.\n"
+                "- If user explicitly typed one of: SCAM/JOB/CRISIS/HELP/MENU/CHECK/DONE/GO -> command.\n"
                 "- Otherwise -> content_check, and choose best agent_guess if clear.\n"
             ),
             user=stripped[:4000],

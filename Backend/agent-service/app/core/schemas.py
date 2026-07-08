@@ -4,7 +4,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-AgentType = Literal["scam", "job_offer", "crisis_rumor", "rental_redflag"]
+AgentType = Literal["scam", "job_offer", "crisis_rumor"]
 VerdictStatus = Literal[
     "high_risk",
     "medium_risk",
@@ -17,7 +17,7 @@ VerdictStatus = Literal[
 ]
 SpanSeverity = Literal["risk", "verified", "pending"]
 RouterIntent = Literal[
-    "scam", "job_offer", "crisis_rumor", "rental_redflag", "general_help"
+    "scam", "job_offer", "crisis_rumor", "general_help"
 ]
 
 

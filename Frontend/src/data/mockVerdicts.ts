@@ -6,8 +6,6 @@ const JOB_INPUT = `Congratulations! You are selected for Remote Data Entry at Am
 
 const CRISIS_INPUT = `URGENT FORWARD TO ALL GROUPS: Mullaperiyar dam has developed cracks. Water will flood Ernakulam and Aluva by tonight. Evacuate immediately. Do not trust govt silence. Share widely before they delete this. - Local volunteer network`;
 
-const RENTAL_INPUT = `Clause 14: Tenant shall forfeit entire security deposit (₹1,50,000) for any delay in rent beyond 2 days. Landlord may enter premises at any time without notice. Tenant waives right to challenge eviction in any court. Subletting prohibited with penalty equal to 12 months rent.`;
-
 export const HERO_SCAM_EXAMPLE = SCAM_INPUT;
 
 export const MOCK_VERDICTS: Record<AgentType, AnnotatedVerdict> = {
@@ -181,64 +179,6 @@ export const MOCK_VERDICTS: Record<AgentType, AnnotatedVerdict> = {
       { start: 131, end: 175, tag: 4, severity: "risk" },
     ],
   },
-
-  rental_redflag: {
-    agent: "rental_redflag",
-    status: "medium_risk",
-    confidence: 0.82,
-    risk_score: 64,
-    red_flags: [
-      "Forfeiture of full deposit for minor delay",
-      "Unlimited landlord entry without notice",
-      "Waiver of tenant's right to legal challenge",
-      "Penalty disproportionate to subletting breach",
-    ],
-    evidence: [
-      {
-        source_name: "India Code — Rent Control Acts",
-        source_url: "https://www.indiacode.nic.in/",
-        supports_claim: false,
-        snippet:
-          "Many state rent laws limit deposit forfeiture and require reasonable notice for entry.",
-      },
-      {
-        source_name: "NALSA — Tenant Rights",
-        source_url: "https://nalsa.gov.in/",
-        supports_claim: false,
-        snippet:
-          "Tenants cannot validly waive fundamental access to courts for eviction disputes.",
-      },
-      {
-        source_name: "Model Tenancy Act (MoHUA)",
-        source_url:
-          "https://mohua.gov.in/",
-        supports_claim: false,
-        snippet:
-          "Model framework recommends capped security deposits and defined notice periods.",
-      },
-      {
-        source_name: "Consumer Court Precedents",
-        source_url: "https://edaakhil.nic.in/",
-        supports_claim: false,
-        snippet:
-          "Consumer forums have struck down clauses permitting arbitrary deposit forfeiture.",
-      },
-    ],
-    explanation:
-      "Several clauses appear one-sided and may be unenforceable under Indian tenancy law, but enforceability depends on your state and registration status.",
-    recommended_action:
-      "Ask for revisions before signing. Consult a local tenant lawyer or NALSA helpline (15100) if the landlord refuses changes.",
-    needs_human_review: true,
-    disclaimer:
-      "Not legal advice. Rental law varies by state. Have a qualified lawyer review your full agreement.",
-    input_text: RENTAL_INPUT,
-    flagged_spans: [
-      { start: 0, end: 95, tag: 1, severity: "risk" },
-      { start: 96, end: 148, tag: 2, severity: "risk" },
-      { start: 149, end: 203, tag: 3, severity: "risk" },
-      { start: 204, end: 268, tag: 4, severity: "pending" },
-    ],
-  },
 };
 
 export function getMockVerdict(
@@ -282,7 +222,6 @@ export const ALL_SOURCE_NAMES = [
   "Amazon Careers",
   "PIB Fact Check",
   "Kerala SDMA",
-  "Model Tenancy Act",
 ];
 
 export const MOCK_CHECK_HISTORY = [
@@ -306,12 +245,5 @@ export const MOCK_CHECK_HISTORY = [
     inputPreview: "URGENT: Mullaperiyar dam has developed cracks…",
     status: "likely_false" as const,
     createdAt: "2026-06-25T18:40:00Z",
-  },
-  {
-    id: "4",
-    agent: "rental_redflag" as const,
-    inputPreview: "Clause 14: Tenant shall forfeit entire deposit…",
-    status: "medium_risk" as const,
-    createdAt: "2026-06-24T11:05:00Z",
   },
 ];

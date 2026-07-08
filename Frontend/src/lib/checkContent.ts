@@ -23,19 +23,6 @@ export async function checkContent(
     return getMockVerdict(agent, input);
   }
 
-  if (agent === "rental_redflag" && input.file) {
-    const form = new FormData();
-    form.append("text", input.text);
-    if (input.jurisdiction) form.append("jurisdiction", input.jurisdiction);
-    form.append("file", input.file);
-    const res = await fetch(`${API_BASE}/agents/rental_redflag/upload`, {
-      method: "POST",
-      body: form,
-    });
-    if (!res.ok) throw new Error("Check failed. Try again in a moment.");
-    return res.json() as Promise<AnnotatedVerdict>;
-  }
-
   const res = await fetch(`${API_BASE}/agents/${agent}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -41,14 +41,6 @@ const CHECKERS = [
     accent: "index-row-risk",
     numColor: "text-risk",
   },
-  {
-    to: "/rental",
-    num: "04",
-    title: "Rental agreement",
-    desc: "One-sided clauses vs tenancy law references",
-    accent: "index-row-verified",
-    numColor: "text-verified",
-  },
 ];
 
 export function LandingPage() {

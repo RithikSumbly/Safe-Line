@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _paths import bootstrap_app_imports
+
+bootstrap_app_imports()
 
 from app.rag.ingest_corpus import ingest_legal_corpus, ingest_scam_corpus
 

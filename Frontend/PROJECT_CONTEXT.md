@@ -6,14 +6,13 @@ This document records what was built, in what order, and why — for the Himshik
 
 ## What SafeLine is
 
-**SafeLine** is a trust & safety platform with four AI-powered checkers:
+**SafeLine** is a trust & safety platform with three AI-powered checkers:
 
 | Checker | Route | Purpose |
 |---------|-------|---------|
 | Scam Message | `/scam` | Phishing SMS, fake bank alerts, suspicious links |
 | Fake Job Offer | `/jobs` | Upfront-fee offers, impersonated recruiting |
 | Crisis Rumor | `/crisis` | Forwarded emergency claims vs official bulletins |
-| Rental Agreement | `/rental` | One-sided lease clauses vs tenancy law references |
 
 Plus a **WhatsApp bot companion** (UI mockup on landing; backend not built yet).
 
@@ -96,11 +95,11 @@ Started from an **empty** `Frontend/` directory.
 **Built:**
 
 - `src/types/agent.ts` — `AgentVerdict`, `AnnotatedVerdict`, `EvidenceItem`, etc.
-- `src/data/mockVerdicts.ts` — realistic mock examples per agent (HDFC KYC scam SMS, fake Amazon job, Mullaperiyar flood forward, rental clause)
+- `src/data/mockVerdicts.ts` — realistic mock examples per agent (HDFC KYC scam SMS, fake Amazon job, Mullaperiyar flood forward)
 - `src/lib/checkContent.ts` — single swap point for future backend; ~1.5s mock delay
 - `AnnotatedVerdictCard`, `CheckingSourcesLoader`, layout (Nav, Footer, AppLayout)
-- Landing page: hero demo, how-it-works (4 numbered steps), checker cards, trust section, WhatsApp mockup
-- Four tool pages with agent-specific inputs
+- Landing page: hero demo, how-it-works, checker cards, trust section, WhatsApp mockup
+- Three tool pages with agent-specific inputs
 - `/about` responsible-use page
 - Stub auth/dashboard pages (no live backend yet)
 
@@ -200,7 +199,6 @@ Migration files in repo:
 | `/scam` | Scam checker | Public |
 | `/jobs` | Job offer checker | Public |
 | `/crisis` | Crisis rumor checker | Public |
-| `/rental` | Rental agreement checker | Public |
 | `/about` | Responsible use | Public |
 | `/sign-in` | Sign in | Public (redirects if signed in) |
 | `/sign-up` | Sign up | Public (redirects if signed in) |
@@ -242,7 +240,7 @@ Frontend/
 
 ```typescript
 interface AgentVerdict {
-  agent: "scam" | "job_offer" | "crisis_rumor" | "rental_redflag";
+  agent: "scam" | "job_offer" | "crisis_rumor";
   status: "high_risk" | "medium_risk" | ... ;
   confidence: number;       // 0–1
   risk_score: number;       // 0–100
@@ -297,7 +295,7 @@ SUPABASE_SERVICE_ROLE_KEY=<backend-only — never VITE_*>
 
 ## Copy voice (product principle)
 
-Plain, calm, specific. No fear tactics or dark patterns. Buttons say exactly what they do (“Check this message”, not “Analyze now”). Real source names cited precisely (Google Safe Browsing, VirusTotal, NALSA, etc.). Disclaimers on every verdict card.
+Plain, calm, specific. No fear tactics or dark patterns. Buttons say exactly what they do (“Check this message”, not “Analyze now”). Real source names cited precisely (Google Safe Browsing, VirusTotal, etc.). Disclaimers on every verdict card.
 
 ---
 

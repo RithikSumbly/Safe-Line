@@ -9,8 +9,8 @@ export function Footer() {
           <div>
             <p className="font-display text-xl font-semibold text-ink">SafeLine</p>
             <p className="measure mt-2 font-sans text-sm leading-relaxed text-ink/55">
-              A verification desk for suspicious messages, offers, rumors, and
-              rental clauses — every verdict tied to named sources.
+              A verification desk for suspicious messages, offers, and rumors —
+              every verdict tied to named sources.
             </p>
           </div>
           <nav
@@ -25,9 +25,6 @@ export function Footer() {
             </Link>
             <Link to="/crisis" className="text-ink/55 hover:text-ink">
               Crisis rumors
-            </Link>
-            <Link to="/rental" className="text-ink/55 hover:text-ink">
-              Rental agreements
             </Link>
             <Link to="/about" className="text-ink/55 hover:text-ink">
               Responsible use

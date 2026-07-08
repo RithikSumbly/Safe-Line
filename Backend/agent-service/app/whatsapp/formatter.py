@@ -32,7 +32,7 @@ def format_verdict_message(verdict: AgentVerdict, *, onboarding: bool = False) -
     parts: list[str] = []
     if onboarding:
         parts.append(
-            "Welcome to SafeLine. Forward suspicious messages or reply SCAM, JOB, CRISIS, or RENTAL."
+            "Welcome to SafeLine. Forward suspicious messages or reply SCAM, JOB, or CRISIS."
         )
     emoji = STATUS_EMOJI.get(verdict.status, "🟨")
     parts.append(f"{emoji} SafeLine verdict: {_stamp_label(verdict.status)}")

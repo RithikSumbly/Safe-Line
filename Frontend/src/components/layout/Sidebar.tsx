@@ -1,13 +1,12 @@
 import {
   Briefcase,
-  FileText,
   Home,
+  Info,
   LayoutDashboard,
   MessageCircle,
   Pin,
   PinOff,
   Radio,
-  Settings,
   ShieldAlert,
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -21,7 +20,6 @@ const NAV_MAIN = [
   { to: "/scam", label: "Scams", icon: ShieldAlert },
   { to: "/jobs", label: "Jobs", icon: Briefcase },
   { to: "/crisis", label: "Rumors", icon: Radio },
-  { to: "/rental", label: "Rentals", icon: FileText },
 ] as const;
 
 const NAV_BOTTOM = [
@@ -32,7 +30,7 @@ const NAV_BOTTOM = [
     external: true,
   },
   { to: "/dashboard", label: "Archive", icon: LayoutDashboard },
-  { to: "/about", label: "Settings", icon: Settings },
+  { to: "/about", label: "About", icon: Info },
 ] as const;
 
 export function Sidebar() {

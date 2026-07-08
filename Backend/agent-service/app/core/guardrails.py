@@ -27,10 +27,6 @@ DISCLAIMERS: dict[AgentType, str] = {
         "Verify with official disaster management and government sources "
         "before acting on forwarded claims."
     ),
-    "rental_redflag": (
-        "This is document literacy support, not legal advice. For disputes, "
-        "consult a lawyer or your local legal aid (NALSA)."
-    ),
 }
 
 

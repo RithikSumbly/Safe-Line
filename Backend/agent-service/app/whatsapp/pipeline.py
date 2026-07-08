@@ -8,7 +8,6 @@ from typing import Awaitable, Callable, Optional, Protocol
 
 from app.agents.crisis_rumor import run_crisis_agent
 from app.agents.job_offer import run_job_agent
-from app.agents.rental_redflag import run_rental_agent
 from app.agents.scam import run_scam_agent
 from app.core.schemas import AgentType, CheckInput
 from app.db.supabase_client import Timer, find_user_by_whatsapp, log_agent_run, save_check_for_user
@@ -23,7 +22,6 @@ AGENT_RUNNERS = {
     "scam": run_scam_agent,
     "job_offer": run_job_agent,
     "crisis_rumor": run_crisis_agent,
-    "rental_redflag": run_rental_agent,
 }
 
 
@@ -38,7 +36,7 @@ class InboundMessage:
     message_id: str
     text: str = ""
     image_bytes: Optional[bytes] = None
-    document_bytes: Optional[bytes] = None  # rental PDFs
+    document_bytes: Optional[bytes] = None
 
 
 def _now_iso() -> str:
@@ -47,12 +45,11 @@ def _now_iso() -> str:
 
 def _help_text() -> str:
     return (
-        "SafeLine can check 4 things:\n"
+        "SafeLine can check 3 things:\n"
         "1) SCAM — suspicious SMS/links\n"
         "2) JOB — fake job offers\n"
         "3) CRISIS — forwarded emergency rumors\n"
-        "4) RENTAL — one-sided rental clauses\n\n"
-        "Send the message you want checked, or reply SCAM / JOB / CRISIS / RENTAL."
+        "\nSend the message you want checked, or reply SCAM / JOB / CRISIS."
     )
 
 
@@ -62,8 +59,7 @@ def _disambiguation_prompt() -> str:
         "1) Scam message\n"
         "2) Fake job offer\n"
         "3) Crisis rumor\n"
-        "4) Rental agreement\n\n"
-        "Reply with 1–4 or SCAM/JOB/CRISIS/RENTAL."
+        "\nReply with 1–3 or SCAM/JOB/CRISIS."
     )
 
 
@@ -75,8 +71,6 @@ def _parse_agent_choice(text: str) -> Optional[AgentType]:
         return "job_offer"
     if t in {"3", "crisis", "rumor", "rumours", "forward", "urgent"}:
         return "crisis_rumor"
-    if t in {"4", "rental", "rent", "lease", "agreement", "tenant", "landlord"}:
-        return "rental_redflag"
     return None
 
 
@@ -269,27 +263,12 @@ async def handle_inbound(message: InboundMessage, messenger: Messenger) -> None:
             await messenger.send_text(phone, _disambiguation_prompt())
         return
 
-    # Rental documents: route immediately (skip buffering)
+    # Documents are not supported (only text/images)
     if message.document_bytes:
-        timer = Timer()
-        verdict = await run_rental_agent(
-            CheckInput(text=message.text or "Uploaded rental agreement PDF"),
-            pdf_bytes=message.document_bytes,
+        await messenger.send_text(
+            phone,
+            "PDF/doc uploads are not supported. Please paste the text you want checked.",
         )
-        user_id = await find_user_by_whatsapp(phone)
-        await log_agent_run(
-            agent="rental_redflag",
-            channel="whatsapp",
-            input_text=message.text or "Rental document",
-            verdict=verdict,
-            user_id=user_id,
-            location={"router": {"via": "document"}},
-            latency_ms=timer.elapsed_ms,
-        )
-        if user_id:
-            await save_check_for_user(user_id, "rental_redflag", message.text, verdict)
-        await messenger.send_text(phone, format_verdict_message(verdict))
-        await upsert_session(phone, last_agent="rental_redflag", state="idle")
         return
 
     # Commands: deterministic routing / flushing
@@ -303,7 +282,7 @@ async def handle_inbound(message: InboundMessage, messenger: Messenger) -> None:
             await _flush_and_classify(phone, message.message_id, messenger)
             return
         if cmd.agent:
-            # SCAM/JOB/CRISIS/RENTAL: flush buffer then run named agent; if no content, prompt.
+            # SCAM/JOB/CRISIS: flush buffer then run named agent; if no content, prompt.
             combined = _combine_buffer(sess.get("buffer") or [])
             if not combined and not (message.text.strip().upper() != cmd.command):
                 await upsert_session(phone, state="buffering")

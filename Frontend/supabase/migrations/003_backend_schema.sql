@@ -6,7 +6,7 @@ create table if not exists agent_runs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete set null,
   channel text check (channel in ('web', 'whatsapp')),
-  agent text check (agent in ('scam', 'job_offer', 'crisis_rumor', 'rental_redflag')),
+  agent text check (agent in ('scam', 'job_offer', 'crisis_rumor')),
   input_text text,
   input_location jsonb,
   verdict jsonb not null,
@@ -43,31 +43,13 @@ create policy "Users read own evidence_log"
     )
   );
 
--- Rental documents
-create table if not exists rental_documents (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) on delete cascade,
-  file_path text,
-  original_filename text,
-  jurisdiction text,
-  status text default 'processing',
-  created_at timestamptz default now()
-);
-
-alter table rental_documents enable row level security;
-
-create policy "Users manage own rental_documents"
-  on rental_documents for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
 -- Document chunks with embeddings
 create table if not exists document_chunks (
   id uuid primary key default gen_random_uuid(),
-  document_id uuid references rental_documents(id) on delete cascade,
-  collection text check (collection in ('user_rental_doc', 'legal_reference', 'scam_corpus')),
+  document_id uuid,
+  collection text check (collection in ('scam_corpus')),
   chunk_text text,
-  embedding vector(768),
+  embedding vector(1536),
   metadata jsonb
 );
 
@@ -79,17 +61,7 @@ alter table document_chunks enable row level security;
 
 create policy "Public read reference corpora"
   on document_chunks for select
-  using (collection in ('legal_reference', 'scam_corpus'));
-
-create policy "Users read own rental chunks"
-  on document_chunks for select
-  using (
-    collection = 'user_rental_doc'
-    and exists (
-      select 1 from rental_documents d
-      where d.id = document_chunks.document_id and d.user_id = auth.uid()
-    )
-  );
+  using (collection in ('scam_corpus'));
 
 -- WhatsApp sessions
 create table if not exists whatsapp_sessions (
@@ -112,7 +84,7 @@ create table if not exists eval_runs (
 
 -- Vector similarity search RPC
 create or replace function match_document_chunks(
-  query_embedding vector(768),
+  query_embedding vector(1536),
   match_collection text,
   match_count int default 5,
   match_jurisdiction text default null
@@ -135,12 +107,6 @@ begin
   from document_chunks dc
   where dc.collection = match_collection
     and dc.embedding is not null
-    and (
-      match_jurisdiction is null
-      or match_collection != 'legal_reference'
-      or (dc.metadata->>'jurisdiction') = match_jurisdiction
-      or (dc.metadata->>'tier') = '1'
-    )
   order by dc.embedding <=> query_embedding
   limit match_count;
 end;

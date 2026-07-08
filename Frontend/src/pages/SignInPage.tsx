@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 export function SignInPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading, signInWithEmail, signInWithGoogle } = useAuth();
+  const { user, loading, signInWithEmail } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -37,12 +37,6 @@ export function SignInPage() {
     navigate(from, { replace: true });
   };
 
-  const handleGoogle = async () => {
-    setError(null);
-    const result = await signInWithGoogle();
-    if (result.error) setError(result.error);
-  };
-
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-4 py-14">
       <div className="border border-line rounded-[12px] p-8">
@@ -60,7 +54,15 @@ export function SignInPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="password">Password</Label>
+              <Link
+                to="/forgot-password"
+                className="font-sans text-xs text-ink/60 underline underline-offset-2 hover:text-ink"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <Input
               id="password"
               type="password"
@@ -73,15 +75,6 @@ export function SignInPage() {
           {error && <p className="font-sans text-sm text-risk">{error}</p>}
           <Button type="submit" className="w-full" disabled={submitting}>
             Sign in
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            disabled={submitting}
-            onClick={handleGoogle}
-          >
-            Continue with Google
           </Button>
         </form>
         <p className="mt-6 text-center font-sans text-sm text-ink/60">

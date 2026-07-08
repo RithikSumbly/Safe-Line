@@ -22,8 +22,13 @@ interface AuthContextValue {
     error: string | null;
     needsEmailConfirmation: boolean;
   }>;
-  signInWithGoogle: () => Promise<{ error: string | null }>;
+  requestPasswordReset: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+}
+
+function authRedirectUrl(path: string): string {
+  return `${window.location.origin}${path}`;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -59,7 +64,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUpWithEmail = useCallback(async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: authRedirectUrl("/sign-in") },
+    });
     const needsEmailConfirmation = !error && !data.session;
     return {
       error: error?.message ?? null,
@@ -67,11 +76,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signInWithGoogle = useCallback(async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.origin },
+  const requestPasswordReset = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: authRedirectUrl("/reset-password"),
     });
+    return { error: error?.message ?? null };
+  }, []);
+
+  const updatePassword = useCallback(async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
     return { error: error?.message ?? null };
   }, []);
 
@@ -85,10 +98,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       signInWithEmail,
       signUpWithEmail,
-      signInWithGoogle,
+      requestPasswordReset,
+      updatePassword,
       signOut,
     }),
-    [user, loading, signInWithEmail, signUpWithEmail, signInWithGoogle, signOut],
+    [user, loading, signInWithEmail, signUpWithEmail, requestPasswordReset, updatePassword, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

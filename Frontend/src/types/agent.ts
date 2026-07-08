@@ -1,8 +1,7 @@
 export type AgentType =
   | "scam"
   | "job_offer"
-  | "crisis_rumor"
-  | "rental_redflag";
+  | "crisis_rumor";
 
 export type VerdictStatus =
   | "high_risk"
@@ -70,7 +69,6 @@ export const AGENT_LABELS: Record<AgentType, string> = {
   scam: "Scam Message",
   job_offer: "Fake Job Offer",
   crisis_rumor: "Crisis Rumor",
-  rental_redflag: "Rental Agreement",
 };
 
 export const STATUS_STAMP: Record<
