@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { cn } from "@/lib/cn";
 import type { AnnotatedVerdict, FlaggedSpan } from "@/types/agent";
-import { STATUS_STAMP, toSuperscript } from "@/types/agent";
+import { STATUS_STAMP, STATUS_SUMMARY, toSuperscript } from "@/types/agent";
 
 interface AnnotatedVerdictCardProps {
   verdict: AnnotatedVerdict;
@@ -50,6 +50,20 @@ function buildSegments(
   return segments;
 }
 
+function actionSteps(action: string): string[] {
+  const trimmed = action.trim();
+  if (!trimmed) return [];
+  const lines = trimmed
+    .split(/\n+/)
+    .map((line) => line.replace(/^[-•*]\s*/, "").trim())
+    .filter(Boolean);
+  if (lines.length > 1) return lines;
+  return trimmed
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
 export function AnnotatedVerdictCard({
   verdict,
   animate = true,
@@ -71,6 +85,12 @@ export function AnnotatedVerdictCard({
     () => buildSegments(verdict.input_text, verdict.flagged_spans),
     [verdict.input_text, verdict.flagged_spans],
   );
+  const nextSteps = useMemo(
+    () => actionSteps(verdict.recommended_action),
+    [verdict.recommended_action],
+  );
+  const showHighlights =
+    verdict.flagged_spans.length > 0 && verdict.red_flags.length > 0;
 
   useEffect(() => {
     if (!animate) {
@@ -149,13 +169,35 @@ export function AnnotatedVerdictCard({
           </div>
         </div>
 
+        <p className="mb-4 pr-16 font-sans text-sm leading-relaxed text-ink/70">
+          {STATUS_SUMMARY[verdict.status]}
+        </p>
+
+        {verdict.explanation && (
+          <div className="mb-6 pr-16">
+            <h3 className="kicker mb-2">Summary</h3>
+            <p className="font-sans text-sm leading-relaxed text-ink">
+              {verdict.explanation}
+            </p>
+          </div>
+        )}
+
         <div className="mb-6 pr-16">
+          <h3 className="kicker mb-2">Your message</h3>
+          {showHighlights && (
+            <p className="mb-2 font-mono text-[10px] text-ink/45">
+              Underlined phrases match the issues listed below (¹, ², ³…).
+            </p>
+          )}
           <p className="font-mono text-sm leading-relaxed text-ink whitespace-pre-wrap">
-            {segments.map((seg, i) => {
+            {!showHighlights
+              ? verdict.input_text
+              : segments.map((seg, i) => {
               if (!seg.span) {
                 return <span key={i}>{seg.text}</span>;
               }
               const delay = seg.span.tag * 0.12;
+              const flagLabel = verdict.red_flags[seg.span.tag - 1];
               return (
                 <span key={i} className="relative inline">
                   <span
@@ -163,6 +205,7 @@ export function AnnotatedVerdictCard({
                       "relative inline pb-0.5",
                       SEVERITY_COLORS[seg.span.severity],
                     )}
+                    title={flagLabel}
                   >
                     <span
                       className={cn(
@@ -208,6 +251,31 @@ export function AnnotatedVerdictCard({
             })}
           </p>
         </div>
+
+        {verdict.red_flags.length > 0 && (
+          <div className="mb-6 border-t border-line pt-6">
+            <h3 className="kicker mb-4">
+              {verdict.status === "likely_false" || verdict.status === "high_risk"
+                ? "Why we flagged this"
+                : verdict.status === "unverified"
+                  ? "What we could not verify"
+                  : "Key findings"}
+            </h3>
+            <ol className="space-y-3">
+              {verdict.red_flags.map((flag, i) => (
+                <li
+                  key={i}
+                  className="flex gap-3 font-sans text-sm leading-relaxed text-ink"
+                >
+                  <span className="shrink-0 font-mono text-xs text-ink/50">
+                    {toSuperscript(i + 1)}
+                  </span>
+                  <span>{flag}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
 
         <div className="mb-6 border-t border-line pt-6">
           <h3 className="kicker mb-4">Sources checked</h3>
@@ -309,9 +377,18 @@ export function AnnotatedVerdictCard({
             stamp.color === "pending" && "border-l-pending bg-pending/[0.06]",
           )}
         >
-          <p className="font-sans text-sm font-medium text-ink">
-            {verdict.recommended_action}
-          </p>
+          <h3 className="kicker mb-3">What to do next</h3>
+          {nextSteps.length > 1 ? (
+            <ol className="list-decimal space-y-2 pl-4 font-sans text-sm font-medium text-ink">
+              {nextSteps.map((step, i) => (
+                <li key={i}>{step}</li>
+              ))}
+            </ol>
+          ) : (
+            <p className="font-sans text-sm font-medium text-ink">
+              {verdict.recommended_action}
+            </p>
+          )}
         </div>
 
         <p className="font-mono text-[11px] text-ink/40">{verdict.disclaimer}</p>

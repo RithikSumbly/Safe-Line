@@ -85,6 +85,18 @@ export const STATUS_STAMP: Record<
   outdated: { label: "OUTDATED", color: "pending" },
 };
 
+/** Plain-language summary shown under the stamp */
+export const STATUS_SUMMARY: Record<VerdictStatus, string> = {
+  high_risk: "This message shows strong signs of a scam or fraud.",
+  medium_risk: "Several warning signs were found — proceed with caution.",
+  low_risk: "Some minor concerns, but nothing critical on its own.",
+  likely_safe: "No major red flags found in our checks.",
+  confirmed: "Official or fact-checked sources support this claim.",
+  likely_false: "Fact-checkers or official sources contradict this claim.",
+  unverified: "We could not confirm or debunk this claim from live sources.",
+  outdated: "This may have been true in the past but is no longer current.",
+};
+
 export const SUPER_SCRIPT = ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
 
 export function toSuperscript(n: number): string {

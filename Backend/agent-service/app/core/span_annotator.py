@@ -19,29 +19,37 @@ def _heuristic_spans(
     red_flags: list[str],
     status: VerdictStatus,
 ) -> list[FlaggedSpan]:
-    """Fallback when LLM span annotation is unavailable."""
+    """Fallback when LLM span annotation is unavailable — only exact phrase matches."""
     severity = _severity_for_status(status)
     spans: list[FlaggedSpan] = []
-    tag = 1
     lowered = input_text.lower()
+    tag = 1
+
     for flag in red_flags[:6]:
-        words = [w for w in re.findall(r"[A-Za-z0-9]{4,}", flag) if len(w) >= 4]
-        for word in words[:3]:
-            idx = lowered.find(word.lower())
-            if idx >= 0:
-                spans.append(
-                    FlaggedSpan(
-                        start=idx,
-                        end=idx + len(word),
-                        tag=tag,
-                        severity=severity,
+        # Try progressively shorter word sequences from the red-flag description
+        words = re.findall(r"[A-Za-z0-9']+", flag)
+        matched = False
+        for length in range(min(6, len(words)), 1, -1):
+            for start in range(len(words) - length + 1):
+                phrase = " ".join(words[start : start + length])
+                if len(phrase) < 8:
+                    continue
+                idx = lowered.find(phrase.lower())
+                if idx >= 0:
+                    spans.append(
+                        FlaggedSpan(
+                            start=idx,
+                            end=idx + len(phrase),
+                            tag=tag,
+                            severity=severity,
+                        )
                     )
-                )
-                tag += 1
+                    tag += 1
+                    matched = True
+                    break
+            if matched:
                 break
-    if not spans and input_text.strip():
-        end = min(len(input_text), 80)
-        spans.append(FlaggedSpan(start=0, end=end, tag=1, severity=severity))
+
     return spans
 
 
@@ -54,9 +62,13 @@ async def annotate_spans(
         llm = get_llm_client()
         result = await llm.structured_json(
             system=(
-                "Map red flags to exact character offsets in the input text. "
-                "Return flagged_spans with start, end (exclusive), tag (1-based), "
-                "and severity (risk|verified|pending)."
+                "Map each red flag to an exact verbatim substring in the input message. "
+                "Rules: (1) start/end must be character offsets into the original input only; "
+                "(2) tag is 1-based and matches the red-flag order; "
+                "(3) severity is risk|verified|pending; "
+                "(4) only highlight phrases that literally appear in the message — "
+                "never highlight analyst commentary or words not in the original text; "
+                "(5) omit a span if no exact phrase matches rather than guessing."
             ),
             user=(
                 f"Input text:\n{input_text}\n\n"

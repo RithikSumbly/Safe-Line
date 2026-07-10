@@ -4,7 +4,7 @@ import { HeroLiveDemo } from "@/components/HeroLiveDemo";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { SourceTagRow } from "@/components/SourceTagRow";
 import { StatsStrip } from "@/components/StatsStrip";
-import { WHATSAPP_NUMBER, WhatsAppMockup } from "@/components/WhatsAppMockup";
+import { WHATSAPP_NUMBER, WHATSAPP_NUMBER_DISPLAY, WhatsAppMockup } from "@/components/WhatsAppMockup";
 import { Button } from "@/components/ui/button";
 import { MOCK_VERDICTS } from "@/data/mockVerdicts";
 import { cn } from "@/lib/cn";
@@ -212,7 +212,7 @@ export function LandingPage() {
               Open WhatsApp desk →
             </a>
             <p className="mt-4 font-mono text-[11px] text-ink/40">
-              Save +{WHATSAPP_NUMBER} or tap the link above to start.
+              Save {WHATSAPP_NUMBER_DISPLAY} or tap the link above to start.
             </p>
           </ScrollReveal>
           <ScrollReveal>

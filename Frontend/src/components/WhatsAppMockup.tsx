@@ -2,7 +2,10 @@ import { MOCK_VERDICTS } from "@/data/mockVerdicts";
 import { cn } from "@/lib/cn";
 
 const WHATSAPP_NUMBER =
-  import.meta.env.VITE_WHATSAPP_NUMBER ?? "919876543210";
+  import.meta.env.VITE_WHATSAPP_NUMBER ?? "15551709431";
+
+const WHATSAPP_NUMBER_DISPLAY =
+  import.meta.env.VITE_WHATSAPP_NUMBER_DISPLAY ?? "+1 (555) 170-9431";
 
 export function WhatsAppMockup({ className }: { className?: string }) {
   const verdict = MOCK_VERDICTS.scam;
@@ -35,7 +38,7 @@ export function WhatsAppMockup({ className }: { className?: string }) {
         </div>
       </div>
       <p className="mt-4 text-center font-sans text-sm text-ink/60">
-        Save <span className="font-mono text-ink">+{WHATSAPP_NUMBER}</span> or{" "}
+        Save <span className="font-mono text-ink">{WHATSAPP_NUMBER_DISPLAY}</span> or{" "}
         <a
           href={`https://wa.me/${WHATSAPP_NUMBER}`}
           className="text-verified underline underline-offset-2"
@@ -49,4 +52,4 @@ export function WhatsAppMockup({ className }: { className?: string }) {
   );
 }
 
-export { WHATSAPP_NUMBER };
+export { WHATSAPP_NUMBER, WHATSAPP_NUMBER_DISPLAY };
