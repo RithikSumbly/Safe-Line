@@ -24,8 +24,8 @@ export function ChatPage() {
               SafeLine chat
             </h1>
             <p className="mt-1 font-sans text-sm text-ink/55">
-              Paste suspicious content — I'll route to the right live check and
-              file a verdict.
+              Paste or forward a suspicious message — we'll verify it and file a
+              verdict.
             </p>
           </div>
           <button

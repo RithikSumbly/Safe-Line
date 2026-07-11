@@ -21,9 +21,12 @@ from app.tools.url_extract import extract_urls
 logger = logging.getLogger(__name__)
 
 HELP_TEXT = (
-    "I'm SafeLine — paste or forward any suspicious message and I'll check it. "
-    "I can verify scam texts, fake job offers, and crisis rumors using live sources. "
-    "Just send the message you want checked."
+    "Hi — I'm the SafeLine chat bot.\n\n"
+    "Worried about a message you received? Maybe a fake bank alert, a job offer "
+    "that seems too good to be true, or a rumour about a dam breaking nearby — "
+    "we're here to help.\n\n"
+    "Just paste or forward what you got. We'll verify it against live sources "
+    "and send you a clear verdict."
 )
 
 LOC_RE = re.compile(r"\b(\d{1,3}\.\d+,\s*\d{1,3}\.\d+)\b")

@@ -18,13 +18,13 @@ export function ChatThread({ messages, loading }: ChatThreadProps) {
   if (messages.length === 0 && !loading) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-        <p className="kicker">SafeLine desk</p>
+        <p className="kicker">SafeLine chat</p>
         <h2 className="mt-2 font-display text-xl text-ink">
-          Paste anything suspicious
+          Not sure if a message is real?
         </h2>
         <p className="mt-3 max-w-md font-sans text-sm text-ink/55">
-          Forward a scam SMS, fake job offer, or crisis rumor. I'll pick the
-          right live check and return a cited verdict card.
+          Bank alert, too-good job offer, or a dam-break rumour — paste or
+          forward it here and we'll verify it against live sources.
         </p>
       </div>
     );
