@@ -91,7 +91,7 @@ export function HeroLiveDemo() {
         <p className="kicker">Live intake</p>
         <p className="mt-2 font-sans text-sm text-ink/55">
           Not sure about a bank SMS, job offer, or local rumour? Paste it in
-          chat — SafeLine verifies against live sources and returns a verdict.
+          chat and SafeLine will verify it against live sources.
         </p>
         <div className="mt-4 rounded-[10px] border border-line bg-paper px-4 py-3 font-sans text-sm leading-relaxed text-ink/70 min-h-[120px]">
           {displayText || CYCLE_EXAMPLES[0].input_text}

@@ -117,7 +117,8 @@ export type ChatMessageType =
 export type ChatToolName =
   | "check_scam_message"
   | "check_job_offer"
-  | "check_crisis_rumor";
+  | "check_crisis_rumor"
+  | "answer_safety_question";
 
 export interface ChatHistoryItem {
   role: ChatRole;

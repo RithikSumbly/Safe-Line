@@ -35,6 +35,7 @@ async def classify_intent(text: str) -> RouterResult:
             system=(
                 "Classify user message into scam, job_offer, crisis_rumor, "
                 "or general_help. Return confidence 0-1. "
+                "general_help is for greetings or trust-safety education, not unrelated topics. "
                 "If confidence < 0.6, set clarifying_question asking what they want checked."
             ),
             user=stripped[:4000],

@@ -6,7 +6,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from app.chat.agent_tools import execute_tool, extract_email
+from app.chat.agent_tools import answer_safety_question, execute_tool, extract_email
+from app.chat.scope_guardrails import OFF_SCOPE_REPLY, is_off_topic
 from app.core.llm_client import get_llm_client
 from app.core.schemas import (
     AnnotatedVerdict,
@@ -21,10 +22,10 @@ from app.tools.url_extract import extract_urls
 logger = logging.getLogger(__name__)
 
 HELP_TEXT = (
-    "Hi — I'm the SafeLine chat bot.\n\n"
+    "Hi, I'm the SafeLine chat bot.\n\n"
     "Worried about a message you received? Maybe a fake bank alert, a job offer "
-    "that seems too good to be true, or a rumour about a dam breaking nearby — "
-    "we're here to help.\n\n"
+    "that seems too good to be true, or a rumour about a dam breaking nearby. "
+    "We're here to help.\n\n"
     "Just paste or forward what you got. We'll verify it against live sources "
     "and send you a clear verdict."
 )
@@ -48,7 +49,7 @@ class OrchestratorDecision(BaseModel):
         description="Which checker tool to invoke when action is call_tool",
     )
     tool_args: Optional[ToolCallArgs] = None
-    reply_type: Literal["clarification", "help", "text"] = "text"
+    reply_type: Literal["clarification", "help", "text", "out_of_scope"] = "text"
     assistant_text: str = Field(
         description="Short conversational reply; intro before verdict or clarifying question"
     )
@@ -77,6 +78,14 @@ async def handle_chat_message(
 ) -> ChatMessageResponse:
     urls = extract_urls(text)
     content = _content_to_check(text, history)
+
+    if is_off_topic(text):
+        return ChatMessageResponse(
+            type="clarification",
+            session_id=session_id,
+            assistant_text=OFF_SCOPE_REPLY,
+        )
+
     router_hint = await classify_intent(content)
 
     history_block = "\n".join(
@@ -90,18 +99,22 @@ async def handle_chat_message(
     )
 
     system = (
-        "You are SafeLine, a trust & safety chat assistant. "
-        "You have three tools:\n"
-        "- check_scam_message: phishing SMS, fake bank/KYC alerts, suspicious links, UPI scams\n"
-        "- check_job_offer: fake hiring, registration fees, recruiter impersonation\n"
-        "- check_crisis_rumor: forwarded disaster/evacuation/dam/flood rumors\n\n"
-        "When the user forwards suspicious content to verify, set action=call_tool and pick the right tool. "
-        "Put the full suspicious message in tool_args.text. "
-        "If URLs were detected, pass the first into tool_args.url for scam checks. "
-        "If an email appears, pass it in tool_args.email for job checks. "
-        "For crisis checks, pass coordinates in tool_args.location if present.\n\n"
-        "If the user only says hi/help or it's unclear what to check, set action=reply. "
-        "Do not invent evidence. Keep assistant_text to 1-3 sentences."
+        "You are SafeLine, a trust and safety chat assistant for India.\n\n"
+        "Tools:\n"
+        "- check_scam_message: live check on a specific suspicious SMS, phishing link, "
+        "fake bank/KYC alert, or UPI scam the user pasted\n"
+        "- check_job_offer: live check on a specific job offer or recruiter message\n"
+        "- check_crisis_rumor: live check on a forwarded disaster, evacuation, dam, or flood rumor\n"
+        "- answer_safety_question: short educational answer when the user asks how scams work, "
+        "red flags, or what to do, without pasting a specific message to verify\n\n"
+        "Guardrails:\n"
+        "- Only handle scam, job, crisis, and trust-safety topics\n"
+        "- For off-topic requests (coding, homework, recipes, medical/legal advice, general chat), "
+        "set action=reply and reply_type=out_of_scope\n"
+        "- Use check_* tools when the user shares content to verify\n"
+        "- Use answer_safety_question for general safety questions with no message to check\n"
+        "- Never invent evidence or verdicts yourself\n"
+        "- Keep assistant_text to 1-3 sentences"
     )
 
     user_prompt = (
@@ -160,16 +173,54 @@ async def handle_chat_message(
             )
 
     if decision.action == "reply":
+        if decision.reply_type == "out_of_scope":
+            return ChatMessageResponse(
+                type="clarification",
+                session_id=session_id,
+                assistant_text=OFF_SCOPE_REPLY,
+            )
         msg_type: ChatMessageType = (
             "help" if decision.reply_type == "help" else "clarification"
         )
+        if decision.reply_type == "text":
+            msg_type = "text"
         return ChatMessageResponse(
             type=msg_type,
             session_id=session_id,
             assistant_text=decision.assistant_text or HELP_TEXT,
         )
 
-    if not decision.tool_name or not decision.tool_args:
+    if not decision.tool_name:
+        return ChatMessageResponse(
+            type="clarification",
+            session_id=session_id,
+            assistant_text=decision.assistant_text
+            or "Paste the full suspicious message and I'll run a live check.",
+        )
+
+    if decision.tool_name == "answer_safety_question":
+        question = (
+            decision.tool_args.text if decision.tool_args else None
+        ) or text
+        try:
+            answer = await answer_safety_question(question)
+        except Exception as exc:
+            logger.exception("Safety Q&A failed: %s", exc)
+            return ChatMessageResponse(
+                type="error",
+                session_id=session_id,
+                assistant_text="I couldn't answer that right now. Try pasting the message to check.",
+            )
+        intro = decision.assistant_text.strip()
+        body = f"{intro}\n\n{answer}".strip() if intro else answer
+        return ChatMessageResponse(
+            type="text",
+            session_id=session_id,
+            tool_used="answer_safety_question",
+            assistant_text=body,
+        )
+
+    if not decision.tool_args:
         return ChatMessageResponse(
             type="clarification",
             session_id=session_id,

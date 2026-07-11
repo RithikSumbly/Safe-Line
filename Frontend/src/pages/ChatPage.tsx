@@ -2,6 +2,7 @@ import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatSessionList } from "@/components/chat/ChatSessionList";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { useChatSession } from "@/hooks/useChatSession";
+import { CHAT_TAGLINE } from "@/lib/chatCopy";
 
 export function ChatPage() {
   const {
@@ -23,10 +24,7 @@ export function ChatPage() {
             <h1 className="font-display text-xl text-ink md:text-2xl">
               SafeLine chat
             </h1>
-            <p className="mt-1 font-sans text-sm text-ink/55">
-              Paste or forward a suspicious message — we'll verify it and file a
-              verdict.
-            </p>
+            <p className="mt-1 font-sans text-sm text-ink/55">{CHAT_TAGLINE}</p>
           </div>
           <button
             type="button"

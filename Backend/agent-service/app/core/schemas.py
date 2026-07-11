@@ -75,7 +75,10 @@ class SpanAnnotationResult(BaseModel):
 ChatRole = Literal["user", "assistant", "system"]
 ChatMessageType = Literal["text", "verdict", "clarification", "help", "error"]
 ChatToolName = Literal[
-    "check_scam_message", "check_job_offer", "check_crisis_rumor"
+    "check_scam_message",
+    "check_job_offer",
+    "check_crisis_rumor",
+    "answer_safety_question",
 ]
 
 
