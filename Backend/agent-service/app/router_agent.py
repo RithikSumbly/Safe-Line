@@ -16,7 +16,13 @@ COMMAND_MAP: dict[str, RouterIntent] = {
 KEYWORD_HINTS: list[tuple[RouterIntent, re.Pattern[str]]] = [
     ("scam", re.compile(r"(?i)\b(phish|otp|kyc|bank alert|click here|upi scam)\b")),
     ("job_offer", re.compile(r"(?i)\b(job offer|registration fee|hiring|salary|interview)\b")),
-    ("crisis_rumor", re.compile(r"(?i)\b(flood|earthquake|evacuate|forward|urgent|dam|riot)\b")),
+    (
+        "crisis_rumor",
+        re.compile(
+            r"(?i)\b(flood|earthquake|evacuat|forward|urgent|dam|riot|breaking|protest|"
+            r"school.*closed|paper.*leak|exam.*leak|breach|magnitude\s*\d)\b"
+        ),
+    ),
 ]
 
 

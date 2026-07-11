@@ -16,6 +16,26 @@ T = TypeVar("T", bound=BaseModel)
 _GEMINI_SCHEMA_SKIP = frozenset({"default", "default_factory", "title", "$schema"})
 
 
+def _flatten_anyof_union(node: dict[str, Any]) -> dict[str, Any]:
+    """Gemini response_schema rejects anyOf — flatten Optional[T] (T|null) to T."""
+    variants = node.get("anyOf")
+    if not isinstance(variants, list):
+        return node
+    non_null = [
+        variant
+        for variant in variants
+        if not (isinstance(variant, dict) and variant.get("type") == "null")
+    ]
+    if len(non_null) != 1:
+        return node
+    merged = dict(non_null[0])
+    for key, value in node.items():
+        if key == "anyOf":
+            continue
+        merged.setdefault(key, value)
+    return merged
+
+
 def _inline_json_schema_defs(schema: dict[str, Any]) -> dict[str, Any]:
     """Gemini response_schema rejects top-level $defs — inline referenced models."""
     import copy
@@ -44,6 +64,7 @@ def _gemini_response_schema(model: type[BaseModel]) -> dict[str, Any]:
 
     def clean(node: Any) -> Any:
         if isinstance(node, dict):
+            node = _flatten_anyof_union(node)
             out: dict[str, Any] = {}
             for key, value in node.items():
                 if key in _GEMINI_SCHEMA_SKIP:

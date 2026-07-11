@@ -36,7 +36,12 @@ LOC_RE = re.compile(r"\b(\d{1,3}\.\d+,\s*\d{1,3}\.\d+)\b")
 _GREETING_ONLY = re.compile(r"(?i)^(hi|hello|hey|help|start)[\s!.?]*$")
 _CHECK_HINTS = re.compile(
     r"(?i)\b(won|lottery|prize|claim|otp|kyc|upi|rupee|rs\.?\s*\d|verify|scam|phish|"
-    r"subscribe|click|fake|job|offer|rumou?r|flood|dam|forward|suspicious)\b"
+    r"subscribe|click|fake|job|offer|rumou?r|flood|dam|forward|suspicious|breaking|"
+    r"protest|evacuat|earthquake|school.*closed|paper.*leak|exam.*leak)\b"
+)
+_CRISIS_HINTS = re.compile(
+    r"(?i)\b(flood|earthquake|evacuat|dam|riot|breaking|protest|school.*closed|"
+    r"paper.*leak|exam.*leak|forward this|share to save|magnitude\s*\d|breach)\b"
 )
 _TOOL_MAP: dict[str, ChatToolName] = {
     "scam": "check_scam_message",
@@ -107,6 +112,8 @@ def _resolve_tool_name(content: str, router_hint) -> Optional[ChatToolName]:
     if _looks_like_content_to_check(content):
         if router_hint.intent in _TOOL_MAP and router_hint.confidence >= 0.25:
             return _TOOL_MAP[router_hint.intent]
+        if _CRISIS_HINTS.search(content):
+            return "check_crisis_rumor"
         if extract_urls(content) or _CHECK_HINTS.search(content):
             return "check_scam_message"
     return None

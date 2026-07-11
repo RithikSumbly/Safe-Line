@@ -57,7 +57,7 @@ async def find_user_by_whatsapp(phone: str) -> Optional[str]:
                 .maybe_single()
                 .execute()
             )
-            if res.data:
+            if res and res.data:
                 return res.data["id"]
     except Exception as exc:
         logger.warning("WhatsApp profile lookup failed: %s", exc)
