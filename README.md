@@ -1,3 +1,12 @@
+---
+title: SafeLine
+sdk: docker
+app_port: 7860
+emoji: 🛡️
+colorFrom: blue
+colorTo: green
+---
+
 # SafeLine — Evidence-Backed Trust & Safety Agent for India
 
 > Paste a suspicious SMS, job offer, or crisis rumor. Get a verdict backed by live evidence — not a guess.
