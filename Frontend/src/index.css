@@ -37,6 +37,14 @@ html:not([data-theme]) {
   --color-risk-soft: #ede0de;
   --color-pending-soft: #ebe4d4;
   --color-alive-rgb: 0 212 184;
+  --color-cta: #1e6f5c;
+  --color-cta-hover: #175a4a;
+  --chat-page-bg: #edf0ee;
+  --chat-panel-bg: #f5f7f6;
+  --chat-border: #d8d5cc;
+  --chat-send-disabled-bg: #d8d5cc;
+  --chat-send-disabled-text: #8a9199;
+  --nav-active-fill: color-mix(in srgb, var(--color-alive) 18%, var(--color-paper));
 }
 
 /* Coffee — warm palette only when toggled on */
@@ -52,6 +60,14 @@ html[data-theme="coffee"] {
   --color-risk-soft: #f3ddd4;
   --color-pending-soft: #f8ead8;
   --color-alive-rgb: 200 135 74;
+  --color-cta: #1f6f5c;
+  --color-cta-hover: #175a4a;
+  --chat-page-bg: #f2ebdd;
+  --chat-panel-bg: #faf6ee;
+  --chat-border: #d9cbb5;
+  --chat-send-disabled-bg: #d9cbb5;
+  --chat-send-disabled-text: #a89a82;
+  --nav-active-fill: #e8c9a8;
 }
 
 @layer base {
@@ -125,8 +141,64 @@ html[data-theme="coffee"] {
     @apply rounded-[var(--radius-card-lg)] border border-line bg-paper shadow-sm;
   }
 
+  .chat-page {
+    background-color: var(--chat-page-bg);
+  }
+
+  .chat-workspace {
+    border-color: var(--chat-border);
+    background-color: var(--chat-panel-bg);
+  }
+
+  .chat-workspace-divider {
+    border-color: var(--chat-border);
+  }
+
+  .nav-active-pill {
+    background-color: var(--nav-active-fill);
+    @apply rounded-[8px] border border-line/60;
+  }
+
+  html[data-theme="desk"] .nav-active-pill,
+  html:not([data-theme="coffee"]) .nav-active-pill {
+    @apply border-alive/25;
+    background-color: color-mix(in srgb, var(--color-alive) 18%, var(--color-paper));
+  }
+
+  .nav-session-active {
+    background-color: var(--nav-active-fill);
+    border-color: color-mix(in srgb, var(--chat-border) 85%, transparent);
+  }
+
+  html[data-theme="desk"] .nav-session-active,
+  html:not([data-theme="coffee"]) .nav-session-active {
+    @apply border-alive/25;
+    background-color: color-mix(in srgb, var(--color-alive) 18%, var(--color-paper));
+  }
+
+  .btn-cta {
+    background-color: var(--color-cta);
+    @apply text-paper hover:opacity-100;
+  }
+
+  .btn-cta:hover {
+    background-color: var(--color-cta-hover);
+  }
+
+  .btn-cta:disabled {
+    background-color: var(--chat-send-disabled-bg);
+    color: var(--chat-send-disabled-text);
+    @apply cursor-not-allowed opacity-100;
+  }
+
   html[data-theme="coffee"] .nav-active-pill {
-    @apply border border-pending/35 bg-pending/20 shadow-[0_0_16px_rgb(var(--color-alive-rgb)/0.22)];
+    background-color: #e8c9a8;
+    border-color: #d9cbb5;
+  }
+
+  html[data-theme="coffee"] .nav-session-active {
+    background-color: #e8c9a8;
+    border-color: #d9cbb5;
   }
 
   html[data-theme="coffee"] .landing-hero {

@@ -124,7 +124,7 @@ export function Sidebar() {
       <nav className="relative flex flex-1 flex-col px-2 pb-4">
         {pill.visible && (
           <div
-            className="nav-active-pill absolute left-2 right-2 rounded-[8px] bg-alive/15 shadow-[0_0_20px_rgba(0,212,184,0.25)] transition-[top,height] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+            className="nav-active-pill absolute left-2 right-2 transition-[top,height] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
             style={{ top: pill.top, height: pill.height }}
             aria-hidden
           />

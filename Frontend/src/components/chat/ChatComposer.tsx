@@ -1,5 +1,4 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { extractUrls, urlHostname } from "@/lib/extractUrls";
 import { cn } from "@/lib/cn";
@@ -18,7 +17,8 @@ export function ChatComposer({ onSend, loading, className }: ChatComposerProps) 
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const urls = useMemo(() => extractUrls(text), [text]);
-  const canSend = Boolean(text.trim()) && !loading;
+  const hasText = text.trim().length > 0;
+  const canSend = hasText && !loading;
 
   useLayoutEffect(() => {
     const el = textareaRef.current;
@@ -41,55 +41,51 @@ export function ChatComposer({ onSend, loading, className }: ChatComposerProps) 
     <form
       onSubmit={handleSubmit}
       className={cn(
-        "border-t border-line bg-paper/95 px-4 py-4 backdrop-blur-sm md:px-6",
+        "shrink-0 border-t border-[var(--chat-border)] p-4",
         className,
       )}
     >
-      <div className="mx-auto max-w-3xl space-y-3">
-        {urls.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {urls.map((url) => (
-              <span
-                key={url}
-                className="rounded-full border border-verified/30 bg-verified/[0.08] px-3 py-1 font-mono text-[10px] text-verified"
-              >
-                Link: {urlHostname(url)}
-              </span>
-            ))}
-          </div>
-        )}
-        <div className="flex items-end gap-3">
-          <Textarea
-            ref={textareaRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Paste or forward a suspicious message…"
-            rows={2}
-            className="min-h-[48px] flex-1 resize-none py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-verified/35 focus-visible:ring-offset-1"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e);
-              }
-            }}
-          />
-          <Button
-            type="submit"
-            disabled={!canSend}
-            className={cn(
-              "shrink-0 disabled:pointer-events-none disabled:opacity-100",
-              canSend
-                ? "bg-verified text-paper hover:bg-verified/90"
-                : "border border-line bg-ink/10 text-ink/35 hover:bg-ink/10",
-            )}
-          >
-            {loading ? "Checking…" : "Send"}
-          </Button>
+      {urls.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {urls.map((url) => (
+            <span
+              key={url}
+              className="rounded-full border border-verified/30 bg-verified/[0.08] px-3 py-1 font-mono text-[10px] text-verified"
+            >
+              Link: {urlHostname(url)}
+            </span>
+          ))}
         </div>
-        <p className="font-mono text-[10px] text-ink/40">
-          Enter to send · Shift+Enter for new line · Links detected automatically
-        </p>
+      )}
+      <div className="flex items-end gap-3">
+        <Textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Paste or forward a suspicious message…"
+          rows={2}
+          className="min-h-[48px] flex-1 resize-none border-[var(--chat-border)] bg-[var(--chat-panel-bg)] py-2.5 focus:border-[var(--color-cta)] focus:outline-none focus:ring-2 focus:ring-[var(--color-cta)] focus:ring-offset-1"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSubmit(e);
+            }
+          }}
+        />
+        <button
+          type="submit"
+          disabled={!canSend}
+          className={cn(
+            "btn-cta inline-flex h-10 shrink-0 items-center justify-center rounded-[6px] px-4 font-sans text-sm font-medium transition-colors",
+            !canSend && "cursor-not-allowed",
+          )}
+        >
+          {loading ? "Checking…" : "Send"}
+        </button>
       </div>
+      <p className="mt-2 font-mono text-[10px] text-ink/40">
+        Enter to send · Shift+Enter for new line · Links detected automatically
+      </p>
     </form>
   );
 }
