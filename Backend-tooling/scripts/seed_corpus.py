@@ -15,6 +15,17 @@ from app.rag.ingest_corpus import ingest_legal_corpus, ingest_scam_corpus
 
 
 async def main() -> None:
+    from pathlib import Path
+    import subprocess
+    import sys
+
+    tooling_root = Path(__file__).resolve().parents[1]
+    repo_root = tooling_root.parent
+    converter = tooling_root / "scripts" / "convert_data_txt_corpus.py"
+    data_txt = repo_root / "data.txt"
+    if data_txt.is_file() and converter.is_file():
+        subprocess.run([sys.executable, str(converter)], check=False)
+
     n_scam = await ingest_scam_corpus()
     n_legal = await ingest_legal_corpus()
     print(f"Ingested {n_scam} scam chunks, {n_legal} legal chunks")

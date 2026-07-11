@@ -1,10 +1,13 @@
-import { Check, Copy, ExternalLink, X } from "lucide-react";
+import { Copy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { AnnotatedMessageBlock } from "@/components/verdict/AnnotatedMessageBlock";
+import { SourcesCheckedList } from "@/components/verdict/SourcesCheckedList";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { submitFeedback } from "@/lib/feedbackApi";
+import { actionSteps } from "@/lib/verdictFormat";
 import { confidenceBarClass, riskScoreBarClass } from "@/lib/riskSemantics";
 import { cn } from "@/lib/cn";
-import type { AnnotatedVerdict, FlaggedSpan } from "@/types/agent";
+import type { AnnotatedVerdict } from "@/types/agent";
 import { STATUS_STAMP, STATUS_SUMMARY, toSuperscript } from "@/types/agent";
 
 interface AnnotatedVerdictCardProps {
@@ -15,57 +18,11 @@ interface AnnotatedVerdictCardProps {
   runId?: string | null;
 }
 
-const SEVERITY_COLORS = {
-  risk: "text-risk decoration-risk",
-  verified: "text-verified decoration-verified",
-  pending: "text-pending decoration-pending",
-} as const;
-
 const STAMP_COLORS = {
   risk: "border-risk text-risk",
   verified: "border-verified text-verified",
   pending: "border-pending text-pending",
 } as const;
-
-function buildSegments(
-  text: string,
-  spans: FlaggedSpan[],
-): Array<{ text: string; span?: FlaggedSpan }> {
-  const sorted = [...spans].sort((a, b) => a.start - b.start);
-  const segments: Array<{ text: string; span?: FlaggedSpan }> = [];
-  let cursor = 0;
-
-  for (const span of sorted) {
-    if (span.start > cursor) {
-      segments.push({ text: text.slice(cursor, span.start) });
-    }
-    segments.push({
-      text: text.slice(span.start, span.end),
-      span,
-    });
-    cursor = span.end;
-  }
-
-  if (cursor < text.length) {
-    segments.push({ text: text.slice(cursor) });
-  }
-
-  return segments;
-}
-
-function actionSteps(action: string): string[] {
-  const trimmed = action.trim();
-  if (!trimmed) return [];
-  const lines = trimmed
-    .split(/\n+/)
-    .map((line) => line.replace(/^[-•*]\s*/, "").trim())
-    .filter(Boolean);
-  if (lines.length > 1) return lines;
-  return trimmed
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-}
 
 export function AnnotatedVerdictCard({
   verdict,
@@ -87,16 +44,10 @@ export function AnnotatedVerdictCard({
     ? verdict.evidence.slice(0, 2)
     : verdict.evidence;
 
-  const segments = useMemo(
-    () => buildSegments(verdict.input_text, verdict.flagged_spans),
-    [verdict.input_text, verdict.flagged_spans],
-  );
   const nextSteps = useMemo(
     () => actionSteps(verdict.recommended_action),
     [verdict.recommended_action],
   );
-  const showHighlights =
-    verdict.flagged_spans.length > 0 && verdict.red_flags.length > 0;
   const familyRewrite = verdict.family_friendly_rewrite?.trim();
 
   async function handleFeedback(helpful: boolean) {
@@ -212,73 +163,12 @@ export function AnnotatedVerdictCard({
         )}
 
         <div className="mb-6 pr-16">
-          <h3 className="kicker mb-2">Your message</h3>
-          {showHighlights && (
-            <p className="mb-2 font-mono text-[10px] text-ink/45">
-              Underlined phrases match the issues listed below (¹, ², ³…).
-            </p>
-          )}
-          <p className="font-mono text-sm leading-relaxed text-ink whitespace-pre-wrap">
-            {!showHighlights
-              ? verdict.input_text
-              : segments.map((seg, i) => {
-              if (!seg.span) {
-                return <span key={i}>{seg.text}</span>;
-              }
-              const delay = seg.span.tag * 0.12;
-              const flagLabel = verdict.red_flags[seg.span.tag - 1];
-              return (
-                <span key={i} className="relative inline">
-                  <span
-                    className={cn(
-                      "relative inline pb-0.5",
-                      SEVERITY_COLORS[seg.span.severity],
-                    )}
-                    title={flagLabel}
-                  >
-                    <span
-                      className={cn(
-                        "absolute bottom-0 left-0 h-0.5 w-full origin-left bg-alive",
-                        animate &&
-                          ready &&
-                          !reduced &&
-                          "animate-[underline-glow-draw_0.55s_ease-out_forwards]",
-                      )}
-                      style={{
-                        animationDelay:
-                          animate && ready && !reduced ? `${delay}s` : undefined,
-                        transform: animate && !ready ? "scaleX(0)" : undefined,
-                      }}
-                    />
-                    <span
-                      className={cn(
-                        "absolute bottom-0 left-0 h-0.5 w-full origin-left",
-                        seg.span.severity === "risk" && "bg-risk",
-                        seg.span.severity === "verified" && "bg-verified",
-                        seg.span.severity === "pending" && "bg-pending",
-                        animate &&
-                          ready &&
-                          "animate-[underline-draw_0.5s_ease-out_forwards]",
-                        !animate && "scale-x-100",
-                      )}
-                      style={{
-                        animationDelay:
-                          animate && ready ? `${delay + 0.08}s` : undefined,
-                        transform: animate && !ready ? "scaleX(0)" : undefined,
-                      }}
-                    />
-                    <span className="relative">{seg.text}</span>
-                    <span
-                      className="absolute -top-3 left-0 font-mono text-[10px] leading-none"
-                      aria-hidden
-                    >
-                      {toSuperscript(seg.span.tag)}
-                    </span>
-                  </span>
-                </span>
-              );
-            })}
-          </p>
+          <AnnotatedMessageBlock
+            verdict={verdict}
+            animate={animate}
+            ready={ready}
+            reducedMotion={reduced}
+          />
         </div>
 
         {verdict.red_flags.length > 0 && (
@@ -307,57 +197,12 @@ export function AnnotatedVerdictCard({
         )}
 
         <div className="mb-6 border-t border-line pt-6">
-          <h3 className="kicker mb-4">Sources checked</h3>
-          <ol className="space-y-4">
-            {evidence.map((item, i) => (
-              <li
-                key={item.source_name + i}
-                className={cn(
-                  "flex gap-3",
-                  animate &&
-                    ready &&
-                    !reduced &&
-                    "animate-[evidence-in_0.45s_cubic-bezier(0.34,1.56,0.64,1)_forwards]",
-                  animate && ready && reduced && "animate-[fade-up_0.4s_ease-out_forwards]",
-                )}
-                style={
-                  animate && ready
-                    ? {
-                        animationDelay: `${0.25 + i * 0.06}s`,
-                        opacity: ready ? undefined : 0,
-                      }
-                    : undefined
-                }
-              >
-                <span className="mt-0.5 shrink-0" aria-hidden>
-                  {item.supports_claim ? (
-                    <Check className="h-4 w-4 text-verified" strokeWidth={2} />
-                  ) : (
-                    <X className="h-4 w-4 text-risk" strokeWidth={2} />
-                  )}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-mono text-xs font-medium text-ink">
-                    {i + 1}. {item.source_name}
-                  </p>
-                  <p className="mt-1 font-sans text-sm text-ink/70">
-                    {item.snippet}
-                  </p>
-                  {item.source_url && (
-                    <a
-                      href={item.source_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-1 inline-flex items-center gap-1 font-mono text-xs text-verified hover:underline"
-                    >
-                      {new URL(item.source_url).hostname}
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ol>
+          <SourcesCheckedList
+            evidence={evidence}
+            animate={animate}
+            ready={ready}
+            reducedMotion={reduced}
+          />
         </div>
 
         <div className="mb-6 flex flex-wrap items-center gap-4">

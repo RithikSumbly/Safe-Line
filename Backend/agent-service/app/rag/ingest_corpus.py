@@ -92,6 +92,11 @@ async def ingest_scam_corpus(*, clear_existing: bool = True) -> int:
 
     raw = json.loads(_CORPUS_PATH.read_text(encoding="utf-8"))
     inserted = 0
+    total_pieces = sum(
+        len(_chunk_text(c)) for doc in raw for c in (doc.get("chunks") or [])
+    )
+    logger.info("Embedding %s corpus chunks from %s sources…", total_pieces, len(raw))
+
     for doc in raw:
         doc_id = str(uuid.uuid4())
         source = doc.get("source", "Reference")
@@ -110,6 +115,8 @@ async def ingest_scam_corpus(*, clear_existing: bool = True) -> int:
                 )
                 if ok:
                     inserted += 1
+                if inserted % 50 == 0 and inserted:
+                    logger.info("…%s / %s chunks ingested", inserted, total_pieces)
 
     logger.info("Ingested %s scam corpus chunks", inserted)
     return inserted

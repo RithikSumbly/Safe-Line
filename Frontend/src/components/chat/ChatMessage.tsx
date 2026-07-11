@@ -1,12 +1,13 @@
-import { AnnotatedVerdictCard } from "@/components/AnnotatedVerdictCard";
+import { VerdictSummaryCard } from "@/components/verdict/VerdictSummaryCard";
 import { cn } from "@/lib/cn";
 import type { ThreadMessage } from "@/types/agent";
 
 interface ChatMessageProps {
   message: ThreadMessage;
+  onOpenReport?: (messageId: string) => void;
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, onOpenReport }: ChatMessageProps) {
   const isUser = message.role === "user";
 
   if (message.verdict) {
@@ -18,7 +19,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
               {message.content}
             </p>
           )}
-          <AnnotatedVerdictCard verdict={message.verdict} runId={message.runId} condensed animate={false} />
+          <VerdictSummaryCard
+            verdict={message.verdict}
+            onViewReport={() => onOpenReport?.(message.id)}
+          />
         </div>
       </div>
     );

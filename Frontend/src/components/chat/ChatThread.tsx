@@ -12,9 +12,10 @@ import type { ThreadMessage } from "@/types/agent";
 interface ChatThreadProps {
   messages: ThreadMessage[];
   loading: boolean;
+  onOpenReport?: (messageId: string) => void;
 }
 
-export function ChatThread({ messages, loading }: ChatThreadProps) {
+export function ChatThread({ messages, loading, onOpenReport }: ChatThreadProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(messages.length);
 
@@ -53,7 +54,7 @@ export function ChatThread({ messages, loading }: ChatThreadProps) {
         {!hasUserMessages ? (
           welcomeMessage ? (
             <div className="mx-auto max-w-md">
-              <ChatMessage message={welcomeMessage} />
+              <ChatMessage message={welcomeMessage} onOpenReport={onOpenReport} />
             </div>
           ) : (
             <div className="text-center">
@@ -67,9 +68,15 @@ export function ChatThread({ messages, loading }: ChatThreadProps) {
           )
         ) : (
           <>
-            {welcomeMessage && <ChatMessage message={welcomeMessage} />}
+            {welcomeMessage && (
+              <ChatMessage message={welcomeMessage} onOpenReport={onOpenReport} />
+            )}
             {conversationMessages.map((msg) => (
-              <ChatMessage key={msg.id} message={msg} />
+              <ChatMessage
+                key={msg.id}
+                message={msg}
+                onOpenReport={onOpenReport}
+              />
             ))}
             {loading && <CheckingSourcesLoader className="max-w-md" />}
           </>

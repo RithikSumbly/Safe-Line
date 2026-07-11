@@ -1,6 +1,8 @@
+import { useCallback, useMemo, useState } from "react";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatSessionList } from "@/components/chat/ChatSessionList";
 import { ChatThread } from "@/components/chat/ChatThread";
+import { VerdictReportPanel } from "@/components/verdict/VerdictReportPanel";
 import { useChatSession } from "@/hooks/useChatSession";
 import { useAuth } from "@/contexts/AuthContext";
 import { CHAT_TAGLINE } from "@/lib/chatCopy";
@@ -17,6 +19,34 @@ export function ChatPage() {
     startNewSession,
     loadSession,
   } = useChatSession();
+
+  const [activeReportId, setActiveReportId] = useState<string | null>(null);
+
+  const activeReport = useMemo(
+    () => messages.find((m) => m.id === activeReportId),
+    [messages, activeReportId],
+  );
+
+  const handleOpenReport = useCallback((messageId: string) => {
+    setActiveReportId(messageId);
+  }, []);
+
+  const handleCloseReport = useCallback(() => {
+    setActiveReportId(null);
+  }, []);
+
+  const handleNewSession = useCallback(() => {
+    setActiveReportId(null);
+    startNewSession();
+  }, [startNewSession]);
+
+  const handleLoadSession = useCallback(
+    (id: string) => {
+      setActiveReportId(null);
+      void loadSession(id);
+    },
+    [loadSession],
+  );
 
   return (
     <div className="chat-page flex h-[calc(100svh-4rem)] min-h-0 flex-col overflow-hidden">
@@ -41,11 +71,15 @@ export function ChatPage() {
         >
           <ChatSessionList
             activeSessionId={sessionId}
-            onSelect={loadSession}
-            onNew={startNewSession}
+            onSelect={handleLoadSession}
+            onNew={handleNewSession}
           />
           <div className="flex min-w-0 flex-1 flex-col">
-            <ChatThread messages={messages} loading={loading} />
+            <ChatThread
+              messages={messages}
+              loading={loading}
+              onOpenReport={handleOpenReport}
+            />
             {error && (
               <p className="shrink-0 border-t border-risk/20 bg-risk/[0.05] px-4 py-2 font-sans text-sm text-risk">
                 {error}
@@ -55,6 +89,15 @@ export function ChatPage() {
           </div>
         </div>
       </div>
+
+      {activeReport?.verdict && (
+        <VerdictReportPanel
+          verdict={activeReport.verdict}
+          runId={activeReport.runId}
+          open
+          onClose={handleCloseReport}
+        />
+      )}
     </div>
   );
 }
