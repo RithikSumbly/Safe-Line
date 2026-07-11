@@ -82,7 +82,8 @@ def _heuristic_draft(
     profile,
 ) -> VerdictDraft:
     neg = sum(1 for e in evidence if not e.supports_claim)
-    needs_review = len(evidence) < 2
+    # Live tools + heuristics are sufficient; RAG is optional enrichment only.
+    needs_review = len(evidence) < 1 and profile.confidence > 0.8
 
     return VerdictDraft(
         status=profile.status,  # type: ignore[arg-type]
@@ -105,7 +106,7 @@ async def run_scam_agent(inp: CheckInput) -> AnnotatedVerdict:
     evidence.extend(await _gather_url_evidence(urls))
     evidence.extend(profile.evidence)
 
-    rag_items = await retrieve_chunks(text, "scam_corpus")
+    rag_items = await retrieve_chunks(text, "scam_corpus", fallback=False)
     evidence.extend(rag_items)
     evidence = filter_irrelevant_evidence(evidence, text)
 
@@ -175,7 +176,9 @@ async def run_scam_agent(inp: CheckInput) -> AnnotatedVerdict:
             evidence=evidence,
             explanation=synth.explanation or profile.explanation,
             recommended_action=synth.recommended_action or profile.recommended_action,
-            needs_human_review=synth.needs_human_review or len(evidence) < 1,
+            needs_human_review=synth.needs_human_review or (
+                len(evidence) < 1 and synth.confidence > 0.85
+            ),
             family_friendly_rewrite=(
                 synth.family_friendly_rewrite or profile.family_friendly_rewrite
             ),

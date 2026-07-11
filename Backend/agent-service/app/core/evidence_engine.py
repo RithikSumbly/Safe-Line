@@ -18,16 +18,25 @@ def normalize_evidence(items: list[EvidenceItem], cap: int = 5) -> list[Evidence
 
 
 def apply_evidence_floor(verdict: AgentVerdict) -> AgentVerdict:
-    """If no evidence, force unverified rather than a confident guess."""
+    """
+    Downgrade only when there is no evidence and no substantive analysis.
+    RAG is optional enrichment; heuristics, LLM reasoning, and live API/link
+    checks all count — an empty vector index must not block a verdict.
+    """
     if not verdict.evidence:
-        verdict.status = "unverified"
-        verdict.confidence = min(verdict.confidence, 0.35)
-        verdict.needs_human_review = True
-        if "unverified" not in verdict.explanation.lower():
-            verdict.explanation = (
-                "We could not retrieve corroborating sources for this claim. "
-                + verdict.explanation
-            )
+        has_analysis = bool(verdict.red_flags) and bool(verdict.explanation.strip())
+        if has_analysis and verdict.agent in ("scam", "job_offer"):
+            verdict.needs_human_review = verdict.confidence > 0.75
+            verdict.confidence = min(verdict.confidence, 0.78)
+        else:
+            verdict.status = "unverified"
+            verdict.confidence = min(verdict.confidence, 0.35)
+            verdict.needs_human_review = True
+            if "unverified" not in verdict.explanation.lower():
+                verdict.explanation = (
+                    "We could not retrieve corroborating sources for this claim. "
+                    + verdict.explanation
+                )
     verdict.evidence = normalize_evidence(verdict.evidence)
     return verdict
 

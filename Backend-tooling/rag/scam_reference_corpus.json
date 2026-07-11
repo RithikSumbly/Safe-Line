@@ -1,0 +1,122 @@
+[
+  {
+    "source": "RBI — safe digital banking",
+    "source_url": "https://www.rbi.org.in/Scripts/BS_ViewMasCirculardetails.aspx?id=12558",
+    "topics": ["bank", "kyc", "otp", "upi", "phishing", "sms"],
+    "chunks": [
+      "Banks and regulated entities never ask customers to share OTPs, PINs, passwords, or full card details over phone, SMS, or email.",
+      "KYC updates for bank accounts are done through official bank branches, apps, or verified websites — not through links in unsolicited SMS.",
+      "If you receive an urgent message claiming your account will be blocked unless you click a link, treat it as phishing and contact the bank using the number on your card or passbook."
+    ]
+  },
+  {
+    "source": "RBI — loan processing fee fraud",
+    "source_url": "https://www.rbi.org.in/Scripts/BS_PressReleaseDisplay.aspx",
+    "topics": ["loan", "pre-approved", "processing fee", "upi", "advance fee"],
+    "chunks": [
+      "Fraudsters send messages offering instant pre-approved personal loans at unusually low interest rates.",
+      "A common advance-fee trick asks victims to pay a refundable processing, insurance, or verification fee via UPI before any loan is disbursed.",
+      "Legitimate RBI-regulated lenders do not demand upfront fees through SMS links or personal UPI IDs to release loan amounts."
+    ]
+  },
+  {
+    "source": "FTC — Prize and lottery scams",
+    "source_url": "https://consumer.ftc.gov/articles/prize-and-lottery-scams",
+    "topics": ["prize", "lottery", "won", "kbc", "fee", "congratulations"],
+    "chunks": [
+      "Real prizes do not require you to pay money, buy gift cards, or pay a registration fee to collect winnings.",
+      "Unexpected messages saying you won a lottery or lucky draw you never entered are a classic scam pattern.",
+      "Scammers may name real brands or TV shows to sound credible while asking for an upfront fee to release the prize."
+    ]
+  },
+  {
+    "source": "YouTube — creator impersonation giveaways",
+    "source_url": "https://support.google.com/youtube/answer/2802268",
+    "topics": ["youtube", "subscribe", "mrbeast", "creator", "giveaway", "prize"],
+    "chunks": [
+      "YouTube creators do not text random people asking them to subscribe to claim cash prizes.",
+      "Fake giveaway scams often misuse famous creator names and include a YouTube link plus a simple action like subscribe or reply.",
+      "Verified giveaways are announced on official channels, not through unsolicited SMS or WhatsApp forwards."
+    ]
+  },
+  {
+    "source": "India Post — parcel and customs fraud",
+    "source_url": "https://www.indiapost.gov.in/",
+    "topics": ["parcel", "customs", "duty", "tracking", "delivery"],
+    "chunks": [
+      "India Post does not ask recipients to pay customs duty through unofficial third-party payment links in SMS.",
+      "Parcel-hold scams invent tracking IDs and threaten destruction or return unless a small fee is paid immediately.",
+      "Always verify parcel status on the official India Post website or the retailer you ordered from."
+    ]
+  },
+  {
+    "source": "Utility bill disconnection scams",
+    "source_url": "https://cybercrime.gov.in/",
+    "topics": ["electricity", "bill", "disconnection", "bijli", "urgent"],
+    "chunks": [
+      "Fraudulent messages claim electricity or gas will be disconnected within hours unless you pay via a link or personal number.",
+      "Real utilities send bills through official apps, portals, or printed notices — not threatening same-day cutoff SMS with unknown links.",
+      "Do not call personal mobile numbers listed in suspicious utility messages; use the official helpline on your physical bill."
+    ]
+  },
+  {
+    "source": "Government scheme impersonation (PM-KISAN, PMJAY, EPFO)",
+    "source_url": "https://www.pmkisan.gov.in/",
+    "topics": ["pm kisan", "pmjay", "epfo", "pm awas", "government", "aadhaar", "subsidy"],
+    "chunks": [
+      "Scammers impersonate real government schemes like PM-KISAN, PMJAY, EPFO, or PMAY and add fake payment or verification steps.",
+      "Official benefit credits do not require sharing ATM PIN, full bank passwords, or paying a fee to release installments.",
+      "Always use official .gov.in portals — for example pmkisan.gov.in or unifiedportal-mem.epfindia.gov.in — not look-alike domains."
+    ]
+  },
+  {
+    "source": "Income Tax refund phishing",
+    "source_url": "https://www.incometax.gov.in/",
+    "topics": ["income tax", "refund", "pan", "it dept"],
+    "chunks": [
+      "The Income Tax Department does not send refund links through unofficial domains asking you to verify PAN within 24 hours.",
+      "Real refund status is checked only at incometax.gov.in or the official e-filing portal.",
+      "Threats that unclaimed refunds will be forfeited to treasury via SMS links are a known phishing pattern."
+    ]
+  },
+  {
+    "source": "Employment registration fee scams",
+    "source_url": "https://www.labour.gov.in/",
+    "topics": ["job", "registration fee", "work from home", "telegram", "deposit"],
+    "chunks": [
+      "Legitimate employers do not charge registration, onboarding, or security deposits before you start work.",
+      "Task-job scams on Telegram ask victims to complete a few free tasks then deposit funds to unlock higher-paying combo tasks.",
+      "Unsolicited high-salary work-from-home offers that move conversation off email to WhatsApp or Telegram are high-risk."
+    ]
+  },
+  {
+    "source": "OTP and impersonation calls",
+    "source_url": "https://cybercrime.gov.in/",
+    "topics": ["otp", "fraud department", "impersonation", "voice"],
+    "chunks": [
+      "No bank fraud department will ever ask you to read out an OTP received on your phone to block a transaction.",
+      "Caller ID can be spoofed; hearing a familiar bank name on a cold call does not prove the caller is genuine.",
+      "If someone claims a suspicious transaction and requests OTP, hang up and call the bank using the number on your card."
+    ]
+  },
+  {
+    "source": "UPI and family emergency scams",
+    "source_url": "https://www.npci.org.in/",
+    "topics": ["upi", "family", "lost phone", "urgent money"],
+    "chunks": [
+      "Hi Mum/Dad style messages claiming a lost phone and urgent UPI transfer are a common impersonation scam.",
+      "Verify through a separate channel — call the family member on their known number before sending money.",
+      "Scammers create artificial urgency to stop you from confirming the story."
+    ]
+  },
+  {
+    "source": "E-commerce and delivery phishing",
+    "source_url": "https://consumer.ftc.gov/articles/how-recognize-and-avoid-phishing-scams",
+    "topics": ["amazon", "flipkart", "delivery", "re-delivery fee", "fake domain"],
+    "chunks": [
+      "Delivery-failure scams use look-alike domains instead of the real retailer site and ask for small re-delivery or customs fees.",
+      "Unrealistic sale prices with unknown links are used to harvest payment details or install malware.",
+      "Track orders only through the app or website where you placed the order."
+    ]
+  }
+]
