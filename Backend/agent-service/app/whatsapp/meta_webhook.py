@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -13,6 +14,11 @@ from app.whatsapp.pipeline import InboundMessage, Messenger, handle_inbound
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
+
+# In-memory debug counters (resets on redeploy) — confirms Meta is hitting the server.
+_last_webhook_at: str | None = None
+_last_webhook_from: str | None = None
+_last_send_error: str | None = None
 
 
 def _verify_signature(payload: bytes, signature: str | None) -> bool:
@@ -36,8 +42,10 @@ def _verify_signature(payload: bytes, signature: str | None) -> bool:
 
 class MetaMessenger(Messenger):
     async def send_text(self, to: str, body: str) -> None:
+        global _last_send_error
         settings = get_settings()
         if not settings.meta_whatsapp_token or not settings.meta_phone_number_id:
+            _last_send_error = "credentials missing"
             logger.warning(
                 "WhatsApp credentials not configured — would send to %s: %s",
                 to,
@@ -56,11 +64,15 @@ class MetaMessenger(Messenger):
                 },
             )
             if res.status_code >= 400:
+                _last_send_error = f"{res.status_code}: {res.text[:200]}"
                 logger.error(
                     "WhatsApp send failed (%s): %s",
                     res.status_code,
                     res.text[:300],
                 )
+                raise RuntimeError(_last_send_error)
+            _last_send_error = None
+            logger.info("WhatsApp sent reply to %s (%d chars)", to[-4:], len(body))
 
     async def send_typing(self, to: str, message_id: str) -> None:
         settings = get_settings()
@@ -153,6 +165,7 @@ async def whatsapp_status():
     settings = get_settings()
     return {
         "webhook_path": "/whatsapp/webhook",
+        "callback_url": "https://celestiallord-safe-line.hf.space/whatsapp/webhook",
         "token_configured": bool(settings.meta_whatsapp_token),
         "phone_number_id_configured": bool(settings.meta_phone_number_id),
         "verify_token_configured": bool(settings.meta_verify_token),
@@ -161,6 +174,13 @@ async def whatsapp_status():
             settings.meta_whatsapp_token
             and settings.meta_phone_number_id
             and settings.meta_verify_token
+        ),
+        "last_webhook_at": _last_webhook_at,
+        "last_webhook_from": _last_webhook_from,
+        "last_send_error": _last_send_error,
+        "hint": (
+            "If last_webhook_at stays null when you message the bot, Meta is not "
+            "delivering to the callback URL — configure WhatsApp → Configuration."
         ),
     }
 
@@ -179,6 +199,7 @@ async def verify_webhook(
 
 @router.post("/webhook")
 async def receive_webhook(request: Request):
+    global _last_webhook_at, _last_webhook_from
     body = await request.body()
     sig = request.headers.get("X-Hub-Signature-256")
     if not _verify_signature(body, sig):
@@ -187,6 +208,9 @@ async def receive_webhook(request: Request):
     payload = await request.json()
     for msg in _extract_messages(payload):
         phone = msg.get("from", "")
+        _last_webhook_at = datetime.now(timezone.utc).isoformat()
+        _last_webhook_from = phone or None
+        logger.info("Webhook received from %s", phone[-4:] if phone else "?")
         message_id = msg.get("id", "")
         msg_type = msg.get("type", "text")
         text = ""
