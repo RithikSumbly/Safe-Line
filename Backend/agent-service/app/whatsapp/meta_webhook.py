@@ -27,6 +27,11 @@ router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 # Keep background tasks alive on HF Spaces.
 _background_tasks: set[asyncio.Task[None]] = set()
 
+# Meta may retry the same webhook — dedupe by message id to avoid double replies.
+_processed_message_ids: dict[str, float] = {}
+_DEDUPE_TTL_SECONDS = 3600
+_MAX_DEDUPE_IDS = 5000
+
 _META_TIMEOUT = httpx.Timeout(connect=60.0, read=60.0, write=30.0, pool=60.0)
 _RELAY_TIMEOUT = httpx.Timeout(connect=20.0, read=60.0, write=30.0, pool=20.0)
 _meta_client: httpx.AsyncClient | None = None
@@ -411,6 +416,21 @@ def _extract_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
+def _is_duplicate_message(message_id: str) -> bool:
+    if not message_id:
+        return False
+    now = time.time()
+    if message_id in _processed_message_ids:
+        return True
+    _processed_message_ids[message_id] = now
+    if len(_processed_message_ids) > _MAX_DEDUPE_IDS:
+        cutoff = now - _DEDUPE_TTL_SECONDS
+        stale = [key for key, seen_at in _processed_message_ids.items() if seen_at < cutoff]
+        for key in stale:
+            del _processed_message_ids[key]
+    return False
+
+
 @router.get("/probe")
 async def whatsapp_probe():
     """Test outbound HTTPS to graph.facebook.com from this container."""
@@ -578,6 +598,12 @@ async def receive_webhook(request: Request):
             text = img.get("caption") or ""
 
         if phone and (text or pdf_bytes or image_bytes):
+            if _is_duplicate_message(message_id):
+                logger.info(
+                    "Skipping duplicate WhatsApp webhook for %s",
+                    message_id[-8:] if message_id else "?",
+                )
+                continue
             logger.info("WhatsApp inbound from %s type=%s", phone[-4:], msg_type)
             # Ack Meta immediately; process + send reply in a tracked background task.
             _spawn_message_task(

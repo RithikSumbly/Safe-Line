@@ -14,6 +14,11 @@ def enforce_browser_csrf(request: Request) -> None:
     if not settings.api_csrf_enabled:
         return
 
+    # Meta webhooks and relay callbacks are server-to-server (no Origin header).
+    path = request.scope.get("path", "")
+    if path.startswith("/whatsapp"):
+        return
+
     origin = request.headers.get("origin")
     if not origin:
         # Non-browser clients (curl, WhatsApp relay) omit Origin.

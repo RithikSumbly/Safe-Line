@@ -66,6 +66,7 @@ def test_chat_accepts_browser_headers(mock_chat, client):
 def test_csrf_blocks_bad_origin():
     scope = {
         "type": "http",
+        "path": "/chat/message",
         "headers": [(b"origin", b"https://evil.example")],
         "method": "POST",
     }
@@ -84,6 +85,7 @@ def test_csrf_blocks_bad_origin():
 def test_csrf_allows_production_vercel_origin():
     scope = {
         "type": "http",
+        "path": "/chat/message",
         "headers": [
             (b"origin", b"https://safe-line-khaki.vercel.app"),
             (b"x-safeline-client", b"web"),
@@ -99,6 +101,19 @@ def test_csrf_allows_production_vercel_origin():
             "http://localhost:5173",
             "https://safe-line-khaki.vercel.app",
         }
+        enforce_browser_csrf(request)
+
+
+def test_csrf_skips_whatsapp_webhook_path():
+    scope = {
+        "type": "http",
+        "path": "/whatsapp/webhook",
+        "headers": [(b"origin", b"https://evil.example")],
+        "method": "POST",
+    }
+    request = Request(scope)
+    with patch("app.security.csrf.get_settings") as mock_settings:
+        mock_settings.return_value.api_csrf_enabled = True
         enforce_browser_csrf(request)
 
 
