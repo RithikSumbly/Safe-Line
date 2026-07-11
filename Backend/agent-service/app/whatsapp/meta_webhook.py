@@ -6,12 +6,15 @@ import hmac
 import json
 import logging
 import os
+import ssl
+import subprocess
 import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
+import certifi
 import httpx
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
@@ -46,8 +49,62 @@ def _format_exc(exc: BaseException) -> str:
 
 
 def _running_on_hf() -> bool:
-    # HF Spaces set SPACE_ID; async httpx TLS to graph.facebook.com often times out there.
+    # HF Spaces set SPACE_ID; Python SSL to graph.facebook.com is unreliable there.
     return bool(os.environ.get("SPACE_ID"))
+
+
+def _ssl_context() -> ssl.SSLContext:
+    return ssl.create_default_context(cafile=certifi.where())
+
+
+def _curl_post(
+    url: str,
+    headers: dict[str, str],
+    payload: dict[str, Any],
+) -> tuple[int, str]:
+    args = [
+        "curl",
+        "-sS",
+        "--max-time",
+        "90",
+        "-w",
+        "\n__HTTP_STATUS__%{http_code}",
+        "-X",
+        "POST",
+        url,
+        "-H",
+        "Content-Type: application/json",
+    ]
+    for key, value in headers.items():
+        args.extend(["-H", f"{key}: {value}"])
+    args.extend(["--data-binary", json.dumps(payload)])
+
+    try:
+        proc = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            timeout=95,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("curl not installed") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise TimeoutError("curl timed out") from exc
+
+    stdout = proc.stdout or ""
+    if "__HTTP_STATUS__" in stdout:
+        body, _, status_part = stdout.rpartition("\n__HTTP_STATUS__")
+        status = int(status_part.strip())
+    else:
+        body = stdout
+        status = 0
+
+    if proc.returncode != 0 and status == 0:
+        detail = (proc.stderr or proc.stdout or "curl failed").strip()
+        raise RuntimeError(detail)
+
+    return status, body
 
 
 def _urllib_post(
@@ -63,11 +120,29 @@ def _urllib_post(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=90) as resp:
+        with urllib.request.urlopen(req, timeout=90, context=_ssl_context()) as resp:
             return resp.status, resp.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as http_exc:
         body = http_exc.read().decode("utf-8", errors="replace")
         return http_exc.code, body
+
+
+async def _try_transports(
+    url: str,
+    headers: dict[str, str],
+    payload: dict[str, Any],
+    transports: list[tuple[str, Callable[..., tuple[int, str]]]],
+) -> tuple[int, str, str]:
+    errors: list[str] = []
+    for name, fn in transports:
+        try:
+            status, body = await asyncio.to_thread(fn, url, headers, payload)
+            return status, body, name
+        except Exception as exc:
+            msg = _format_exc(exc)
+            errors.append(f"{name}: {msg}")
+            logger.warning("Graph API transport %s failed: %s", name, msg)
+    raise RuntimeError("; ".join(errors))
 
 
 async def _post_graph_api(
@@ -77,8 +152,12 @@ async def _post_graph_api(
 ) -> tuple[int, str, str]:
     """POST to Graph API. Returns (status_code, body, transport)."""
     if _running_on_hf():
-        status, body = await asyncio.to_thread(_urllib_post, url, headers, payload)
-        return status, body, "urllib"
+        return await _try_transports(
+            url,
+            headers,
+            payload,
+            [("curl", _curl_post), ("urllib", _urllib_post)],
+        )
 
     client = _get_meta_client()
     try:
@@ -331,37 +410,51 @@ async def whatsapp_probe():
             "ms": int((time.monotonic() - started) * 1000),
         }
 
+    post_url = f"https://graph.facebook.com/v21.0/{settings.meta_phone_number_id}/messages"
+    probe_payload = {
+        "messaging_product": "whatsapp",
+        "to": "00000000000",
+        "type": "text",
+        "text": {"body": "probe"},
+    }
+
+    for name, fn in [("curl", _curl_post), ("urllib", _urllib_post)]:
+        started = time.monotonic()
+        try:
+            status, _ = await asyncio.to_thread(fn, post_url, headers, probe_payload)
+            results[f"{name}_post"] = {
+                "ok": status < 500,
+                "status": status,
+                "ms": int((time.monotonic() - started) * 1000),
+            }
+        except Exception as exc:
+            results[f"{name}_post"] = {
+                "ok": False,
+                "error": _format_exc(exc),
+                "ms": int((time.monotonic() - started) * 1000),
+            }
+
     started = time.monotonic()
     try:
-        status, _, transport = await _post_graph_api(
-            f"https://graph.facebook.com/v21.0/{settings.meta_phone_number_id}/messages",
-            headers,
-            {
-                "messaging_product": "whatsapp",
-                "to": "00000000000",
-                "type": "text",
-                "text": {"body": "probe"},
-            },
-        )
-        # Meta returns 4xx for invalid recipient — that still proves outbound works.
-        results["post_probe"] = {
+        status, _, transport = await _post_graph_api(post_url, headers, probe_payload)
+        results["combined_post"] = {
             "ok": status < 500,
             "status": status,
             "transport": transport,
             "ms": int((time.monotonic() - started) * 1000),
         }
     except Exception as exc:
-        results["post_probe"] = {
+        results["combined_post"] = {
             "ok": False,
             "error": _format_exc(exc),
             "ms": int((time.monotonic() - started) * 1000),
         }
 
     return {
-        "ok": results.get("post_probe", {}).get("ok", False),
+        "ok": results.get("combined_post", {}).get("ok", False),
         "running_on_hf": _running_on_hf(),
         "results": results,
-        "hint": "post_probe ok with 4xx means outbound to Meta works; 5xx or timeout means HF egress issue.",
+        "hint": "combined_post ok with 4xx means outbound to Meta works; all transports failing means HF cannot reach graph.facebook.com.",
     }
 
 
