@@ -3,7 +3,12 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import hmac
+import json
 import logging
+import os
+import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
@@ -20,6 +25,74 @@ router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 _background_tasks: set[asyncio.Task[None]] = set()
 
 _META_TIMEOUT = httpx.Timeout(connect=60.0, read=60.0, write=30.0, pool=60.0)
+_meta_client: httpx.AsyncClient | None = None
+
+
+def _get_meta_client() -> httpx.AsyncClient:
+    global _meta_client
+    if _meta_client is None or _meta_client.is_closed:
+        _meta_client = httpx.AsyncClient(
+            timeout=_META_TIMEOUT,
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+        )
+    return _meta_client
+
+
+def _format_exc(exc: BaseException) -> str:
+    msg = str(exc).strip()
+    if msg:
+        return f"{type(exc).__name__}: {msg}"
+    return f"{type(exc).__name__}"
+
+
+def _running_on_hf() -> bool:
+    # HF Spaces set SPACE_ID; async httpx TLS to graph.facebook.com often times out there.
+    return bool(os.environ.get("SPACE_ID"))
+
+
+def _urllib_post(
+    url: str,
+    headers: dict[str, str],
+    payload: dict[str, Any],
+) -> tuple[int, str]:
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={**headers, "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            return resp.status, resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as http_exc:
+        body = http_exc.read().decode("utf-8", errors="replace")
+        return http_exc.code, body
+
+
+async def _post_graph_api(
+    url: str,
+    headers: dict[str, str],
+    payload: dict[str, Any],
+) -> tuple[int, str, str]:
+    """POST to Graph API. Returns (status_code, body, transport)."""
+    if _running_on_hf():
+        status, body = await asyncio.to_thread(_urllib_post, url, headers, payload)
+        return status, body, "urllib"
+
+    client = _get_meta_client()
+    try:
+        res = await client.post(url, headers=headers, json=payload)
+        return res.status_code, res.text, "httpx"
+    except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.NetworkError) as exc:
+        logger.warning(
+            "httpx Graph API POST failed (%s), trying urllib fallback",
+            _format_exc(exc),
+        )
+
+    status, body = await asyncio.to_thread(_urllib_post, url, headers, payload)
+    return status, body, "urllib"
+
 
 # In-memory debug counters (resets on redeploy) — confirms Meta is hitting the server.
 _last_webhook_at: str | None = None
@@ -68,35 +141,57 @@ class MetaMessenger(Messenger):
         }
         headers = {"Authorization": f"Bearer {settings.meta_whatsapp_token}"}
 
-        last_exc: Exception | None = None
+        last_error = ""
         for attempt in range(3):
             try:
-                async with httpx.AsyncClient(timeout=_META_TIMEOUT) as client:
-                    res = await client.post(url, headers=headers, json=payload)
-                if res.status_code >= 400:
-                    _last_send_error = f"{res.status_code}: {res.text[:200]}"
+                status, text, transport = await _post_graph_api(url, headers, payload)
+                if status >= 400:
+                    last_error = f"{status}: {text[:200]}"
+                    _last_send_error = last_error
                     logger.error(
-                        "WhatsApp send failed (%s): %s",
-                        res.status_code,
-                        res.text[:300],
+                        "WhatsApp send failed (%s via %s): %s",
+                        status,
+                        transport,
+                        text[:300],
                     )
-                    raise RuntimeError(_last_send_error)
+                    if attempt < 2 and status >= 500:
+                        await asyncio.sleep(2 ** attempt)
+                        continue
+                    raise RuntimeError(last_error)
                 _last_send_error = None
-                logger.info("WhatsApp sent reply to %s (%d chars)", to[-4:], len(body))
+                logger.info(
+                    "WhatsApp sent reply to %s (%d chars via %s)",
+                    to[-4:],
+                    len(body),
+                    transport,
+                )
                 return
             except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.NetworkError) as exc:
-                last_exc = exc
-                _last_send_error = str(exc)
+                last_error = _format_exc(exc)
+                _last_send_error = last_error
                 logger.warning(
                     "WhatsApp send attempt %d/3 failed for %s: %s",
                     attempt + 1,
                     to[-4:],
-                    exc,
+                    last_error,
+                )
+                if attempt < 2:
+                    await asyncio.sleep(2 ** attempt)
+            except RuntimeError:
+                raise
+            except Exception as exc:
+                last_error = _format_exc(exc)
+                _last_send_error = last_error
+                logger.warning(
+                    "WhatsApp send attempt %d/3 failed for %s: %s",
+                    attempt + 1,
+                    to[-4:],
+                    last_error,
                 )
                 if attempt < 2:
                     await asyncio.sleep(2 ** attempt)
 
-        raise RuntimeError(f"WhatsApp send failed after retries: {last_exc}") from last_exc
+        raise RuntimeError(f"WhatsApp send failed after retries: {last_error}")
 
     async def send_typing(self, to: str, message_id: str) -> None:
         # Best-effort only — never block replies on typing indicator.
@@ -207,6 +302,67 @@ def _extract_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
             for msg in value.get("messages", []):
                 out.append(msg)
     return out
+
+
+@router.get("/probe")
+async def whatsapp_probe():
+    """Test outbound HTTPS to graph.facebook.com from this container."""
+    settings = get_settings()
+    if not settings.meta_whatsapp_token:
+        return {"ok": False, "error": "META_WHATSAPP_TOKEN not configured"}
+
+    url = f"https://graph.facebook.com/v21.0/{settings.meta_phone_number_id}"
+    headers = {"Authorization": f"Bearer {settings.meta_whatsapp_token}"}
+    results: dict[str, Any] = {}
+
+    started = time.monotonic()
+    try:
+        client = _get_meta_client()
+        res = await client.get(url, headers=headers)
+        results["httpx_get"] = {
+            "ok": True,
+            "status": res.status_code,
+            "ms": int((time.monotonic() - started) * 1000),
+        }
+    except Exception as exc:
+        results["httpx_get"] = {
+            "ok": False,
+            "error": _format_exc(exc),
+            "ms": int((time.monotonic() - started) * 1000),
+        }
+
+    started = time.monotonic()
+    try:
+        status, _, transport = await _post_graph_api(
+            f"https://graph.facebook.com/v21.0/{settings.meta_phone_number_id}/messages",
+            headers,
+            {
+                "messaging_product": "whatsapp",
+                "to": "00000000000",
+                "type": "text",
+                "text": {"body": "probe"},
+            },
+        )
+        # Meta returns 4xx for invalid recipient — that still proves outbound works.
+        results["post_probe"] = {
+            "ok": status < 500,
+            "status": status,
+            "transport": transport,
+            "ms": int((time.monotonic() - started) * 1000),
+        }
+    except Exception as exc:
+        results["post_probe"] = {
+            "ok": False,
+            "error": _format_exc(exc),
+            "ms": int((time.monotonic() - started) * 1000),
+        }
+
+    return {
+        "ok": results.get("post_probe", {}).get("ok", False),
+        "running_on_hf": _running_on_hf(),
+        "results": results,
+        "hint": "post_probe ok with 4xx means outbound to Meta works; 5xx or timeout means HF egress issue.",
+    }
 
 
 @router.get("/status")
