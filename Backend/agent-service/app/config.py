@@ -8,6 +8,12 @@ _AGENT_SERVICE_DIR = Path(__file__).resolve().parent.parent
 _PROJECT_ROOT = _AGENT_SERVICE_DIR.parent.parent
 _ROOT_ENV = _PROJECT_ROOT / ".env"
 
+# Always permit the live Vercel desk even if HF secrets only list localhost.
+BUILTIN_WEB_ORIGINS = (
+    "http://localhost:5173",
+    "https://safe-line-khaki.vercel.app",
+)
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -77,7 +83,24 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        seen: set[str] = set()
+        origins: list[str] = []
+        for origin in (
+            *[o.strip() for o in self.cors_origins.split(",") if o.strip()],
+            *BUILTIN_WEB_ORIGINS,
+        ):
+            if origin not in seen:
+                seen.add(origin)
+                origins.append(origin)
+        return origins
+
+    def is_allowed_browser_origin(self, origin: str) -> bool:
+        if origin in self.cors_origin_list:
+            return True
+        # Vercel preview deploys for this project (safe-line-*.vercel.app).
+        if origin.startswith("https://safe-line") and origin.endswith(".vercel.app"):
+            return True
+        return False
 
 
 @lru_cache

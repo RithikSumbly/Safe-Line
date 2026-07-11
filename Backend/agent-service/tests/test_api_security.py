@@ -73,9 +73,33 @@ def test_csrf_blocks_bad_origin():
     with patch("app.security.csrf.get_settings") as mock_settings:
         mock_settings.return_value.api_csrf_enabled = True
         mock_settings.return_value.cors_origin_list = ["http://localhost:5173"]
+        mock_settings.return_value.is_allowed_browser_origin = lambda origin: (
+            origin == "http://localhost:5173"
+        )
         with pytest.raises(HTTPException) as exc:
             enforce_browser_csrf(request)
         assert exc.value.status_code == 403
+
+
+def test_csrf_allows_production_vercel_origin():
+    scope = {
+        "type": "http",
+        "headers": [
+            (b"origin", b"https://safe-line-khaki.vercel.app"),
+            (b"x-safeline-client", b"web"),
+        ],
+        "method": "POST",
+    }
+    request = Request(scope)
+    with patch("app.security.csrf.get_settings") as mock_settings:
+        settings = mock_settings.return_value
+        settings.api_csrf_enabled = True
+        settings.cors_origin_list = ["http://localhost:5173"]
+        settings.is_allowed_browser_origin = lambda origin: origin in {
+            "http://localhost:5173",
+            "https://safe-line-khaki.vercel.app",
+        }
+        enforce_browser_csrf(request)
 
 
 def test_in_memory_rate_limiter_blocks_after_limit():
