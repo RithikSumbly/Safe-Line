@@ -58,7 +58,16 @@ Outbound messages (templates) work once `META_WHATSAPP_TOKEN` and `META_PHONE_NU
    - `META_VERIFY_TOKEN` — same string as step 1
    - `META_APP_SECRET` — from App Settings → Basic → **App secret** (must match exactly; trailing spaces break signature verification)
 3. Confirm: `GET https://<host>/whatsapp/status` shows `"ready": true`
-4. Send **hi** to your WhatsApp number — you should get the help menu within a few seconds.
+4. **Subscribe your app to the WABA** (critical — UI alone is not enough):
+
+   ```bash
+   curl -X POST "https://graph.facebook.com/v21.0/<WABA_ID>/subscribed_apps" \
+     -H "Authorization: Bearer $META_WHATSAPP_TOKEN"
+   ```
+
+   Verify with `GET /<WABA_ID>/subscribed_apps` — your app (e.g. "Safe Line") must appear.
+   If only "WA DevX Webhook Events" is listed, live messages will not reach your server.
+5. Send **hi** to your WhatsApp number — you should get the help menu within a few seconds.
 
 If inbound messages are never answered, check HF Space logs for `Invalid signature` — that means `META_APP_SECRET` is wrong.
 
