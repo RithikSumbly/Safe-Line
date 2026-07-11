@@ -5,6 +5,7 @@ import logging
 import dns.resolver
 
 from app.core.schemas import EvidenceItem
+from app.tools.email_domain import is_free_mail_domain
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,13 @@ FREE_MAIL = {"gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "rediffmail
 async def check_mx(domain: str) -> EvidenceItem | None:
     if not domain:
         return None
+    if is_free_mail_domain(domain):
+        return EvidenceItem(
+            source_name="DNS MX lookup",
+            source_url=None,
+            supports_claim=False,
+            snippet=f"{domain} is a free-mail domain — not corporate employer infrastructure.",
+        )
     try:
         answers = dns.resolver.resolve(domain, "MX")
         hosts = [str(r.exchange).lower().rstrip(".") for r in answers]

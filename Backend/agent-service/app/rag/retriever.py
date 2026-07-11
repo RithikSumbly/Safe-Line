@@ -36,6 +36,7 @@ async def retrieve_chunks(
     collection: str,
     *,
     limit: int = 5,
+    fallback: bool = True,
 ) -> list[EvidenceItem]:
     """
     Generic retrieval used by the 3 remaining agents.
@@ -45,11 +46,11 @@ async def retrieve_chunks(
 
     client = get_supabase()
     if not client:
-        return _fallback_evidence(collection)
+        return _fallback_evidence(collection) if fallback else []
 
     embedding = await embed_text(query)
     if not embedding:
-        return _fallback_evidence(collection)
+        return _fallback_evidence(collection) if fallback else []
 
     try:
         params: dict = {
@@ -69,10 +70,10 @@ async def retrieve_chunks(
                     snippet=(row.get("chunk_text") or "")[:400],
                 )
             )
-        return items or _fallback_evidence(collection)
+        return items or (_fallback_evidence(collection) if fallback else [])
     except Exception as exc:
         logger.warning("Vector retrieval failed: %s", exc)
-        return _fallback_evidence(collection)
+        return _fallback_evidence(collection) if fallback else []
 
 
 def _fallback_evidence(collection: str) -> list[EvidenceItem]:
