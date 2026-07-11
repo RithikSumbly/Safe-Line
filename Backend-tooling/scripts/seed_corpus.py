@@ -22,7 +22,7 @@ async def main() -> None:
     tooling_root = Path(__file__).resolve().parents[1]
     repo_root = tooling_root.parent
     converter = tooling_root / "scripts" / "convert_data_txt_corpus.py"
-    data_txt = repo_root / "data.txt"
+    data_txt = repo_root / "data" / "data.txt"
     if data_txt.is_file() and converter.is_file():
         subprocess.run([sys.executable, str(converter)], check=False)
 

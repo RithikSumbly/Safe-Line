@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     google_safe_browsing_key: str = ""
     virustotal_api_key: str = ""
-    phishtank_api_key: str = ""
+    phishtank_api_key: str = ""  # reserved; see app/tools/phishtank.py (stub, unused)
     google_fact_check_key: str = ""
     newsapi_key: str = ""
     tavily_api_key: str = ""
@@ -48,6 +48,12 @@ class Settings(BaseSettings):
 
     upstash_redis_url: str = ""
     upstash_redis_token: str = ""
+
+    api_require_auth: bool = False
+    api_csrf_enabled: bool = True
+    api_rate_limit_enabled: bool = True
+    api_rate_limit_guest_per_hour: int = 20
+    api_rate_limit_auth_per_hour: int = 120
 
     @model_validator(mode="after")
     def _resolve_supabase_url(self) -> "Settings":

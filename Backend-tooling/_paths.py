@@ -8,8 +8,9 @@ from pathlib import Path
 TOOLING_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = TOOLING_ROOT.parent
 AGENT_ROOT = REPO_ROOT / "Backend" / "agent-service"
-RAG_ROOT = TOOLING_ROOT / "rag"
-DATA_ROOT = TOOLING_ROOT / "data"
+DATA_ROOT = REPO_ROOT / "data"
+CORPUS_JSON = DATA_ROOT / "scam_reference_corpus.json"
+DATA_TXT = DATA_ROOT / "data.txt"
 
 
 def bootstrap_app_imports() -> Path:

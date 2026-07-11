@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.agents.crisis_rumor import run_crisis_agent
@@ -23,6 +23,8 @@ from app.core.schemas import (
 from app.db.feedback import submit_verdict_feedback
 from app.db.supabase_client import Timer, log_agent_run
 from app.router_agent import classify_intent
+from app.security.auth import ApiCaller
+from app.security.deps import enforce_api_security
 from app.whatsapp.meta_webhook import router as whatsapp_router
 
 logging.basicConfig(level=logging.INFO)
@@ -57,7 +59,7 @@ async def health():
 
 
 @app.post("/agents/route")
-async def route_agent(inp: CheckInput):
+async def route_agent(inp: CheckInput, caller: ApiCaller = Depends(enforce_api_security)):
     result = await classify_intent(inp.text)
     if result.clarifying_question and result.confidence < 0.6:
         raise HTTPException(status_code=422, detail=result.clarifying_question)
@@ -65,7 +67,10 @@ async def route_agent(inp: CheckInput):
 
 
 @app.post("/chat/message", response_model=ChatMessageResponse)
-async def chat_message(req: ChatMessageRequest):
+async def chat_message(
+    req: ChatMessageRequest,
+    caller: ApiCaller = Depends(enforce_api_security),
+):
     session_id = req.session_id or new_session_id()
     if not req.text.strip():
         return ChatMessageResponse(
@@ -81,6 +86,7 @@ async def chat_message(req: ChatMessageRequest):
             channel="web",
             input_text=req.text,
             verdict=response.verdict,
+            user_id=caller.user_id,
             latency_ms=timer.elapsed_ms,
         )
         response.run_id = run_id
@@ -88,7 +94,11 @@ async def chat_message(req: ChatMessageRequest):
 
 
 @app.post("/agents/{agent}", response_model=AgentCheckResponse)
-async def run_agent(agent: AgentType, inp: CheckInput):
+async def run_agent(
+    agent: AgentType,
+    inp: CheckInput,
+    caller: ApiCaller = Depends(enforce_api_security),
+):
     if agent not in AGENTS:
         raise HTTPException(status_code=404, detail="Unknown agent")
     timer = Timer()
@@ -99,6 +109,7 @@ async def run_agent(agent: AgentType, inp: CheckInput):
         channel="web",
         input_text=inp.text,
         verdict=verdict,
+        user_id=caller.user_id,
         location={"raw": inp.location} if inp.location else None,
         latency_ms=timer.elapsed_ms,
     )
@@ -106,7 +117,10 @@ async def run_agent(agent: AgentType, inp: CheckInput):
 
 
 @app.post("/feedback")
-async def submit_feedback(req: FeedbackRequest):
+async def submit_feedback(
+    req: FeedbackRequest,
+    caller: ApiCaller = Depends(enforce_api_security),
+):
     ok = await submit_verdict_feedback(req.run_id, req.helpful)
     if not ok:
         raise HTTPException(status_code=400, detail="Could not save feedback")

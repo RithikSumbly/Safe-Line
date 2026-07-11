@@ -89,7 +89,7 @@ Never put `SUPABASE_SERVICE_ROLE_KEY` in a `VITE_*` variable.
 
 Apply [`Frontend/supabase/migrations/`](../Frontend/supabase/migrations/) for `agent_runs`, pgvector, etc.
 
-Corpus seeding, eval, and ingestion: see [`Backend-tooling/README.md`](../Backend-tooling/README.md).
+Corpus seeding and ingestion: see [`docs/backend-tooling.md`](backend-tooling.md).
 
 ## Docker
 

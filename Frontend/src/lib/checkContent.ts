@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/apiClient";
 import { getMockVerdict } from "@/data/mockVerdicts";
 import { delay } from "@/lib/constants";
 import type { AgentType, CheckInput, CheckResponse } from "@/types/agent";
@@ -23,9 +24,8 @@ export async function checkContent(
     return { verdict: getMockVerdict(agent, input), run_id: null };
   }
 
-  const res = await fetch(`${API_BASE}/agents/${agent}`, {
+  const res = await apiFetch(`/agents/${agent}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(serializeInput(input)),
   });
   if (!res.ok) {

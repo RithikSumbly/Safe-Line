@@ -1,15 +1,11 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL as string | undefined;
+import { apiFetch } from "@/lib/apiClient";
 
 export async function submitFeedback(
   runId: string,
   helpful: boolean,
 ): Promise<void> {
-  if (!API_BASE) {
-    return;
-  }
-  const res = await fetch(`${API_BASE}/feedback`, {
+  const res = await apiFetch("/feedback", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ run_id: runId, helpful }),
   });
   if (!res.ok) {

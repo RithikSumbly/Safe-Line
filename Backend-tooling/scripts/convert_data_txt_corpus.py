@@ -1,4 +1,4 @@
-"""Convert repo-root data.txt (Python corpus builder) to scam_reference_corpus.json."""
+"""Convert data/data.txt (Python corpus builder) to data/scam_reference_corpus.json."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_TXT = REPO_ROOT / "data.txt"
-OUT_JSON = REPO_ROOT / "Backend-tooling" / "rag" / "scam_reference_corpus.json"
+DATA_TXT = REPO_ROOT / "data" / "data.txt"
+OUT_JSON = REPO_ROOT / "data" / "scam_reference_corpus.json"
 
 
 def _load_builder_source() -> str:

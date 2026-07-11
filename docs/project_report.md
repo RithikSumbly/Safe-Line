@@ -1,13 +1,29 @@
 # SafeLine Project Report
 
+**Team AURA** — Himshikhar 2026 Agentic AI Capstone
+
+| Name | Roll No. |
+|---|---|
+| Rithik Vimal Sumbly | 216 |
+| Suave Krishan Doda | 234 |
+| Kushagra Mathur | 136 |
+| Ruthwin Venkatesh | 184 |
+| Tushika Gupta | 166 |
+
 ## Problem
 
 SafeLine is a unified trust & safety platform helping users verify suspicious messages, job offers, and crisis rumors before they act. Every verdict is grounded in named external sources — not LLM guesses alone.
 
+## Reference data
+
+- **Primary corpus:** [`data/scam_reference_corpus.json`](../data/scam_reference_corpus.json) — RBI/NPCI/FTC-style advisories, embedded with `gemini-embedding-001` into Supabase pgvector
+- **External:** [FTC job scams guidance](https://consumer.ftc.gov/articles/job-scams)
+- **Supplementary:** [`data/sample_scam_messages.csv`](../data/sample_scam_messages.csv) — labeled example messages (capstone CSV format)
+
 ## Architecture
 
 - **Frontend:** Vite + React + Supabase Auth/history
-- **Backend:** FastAPI + Gemini + LangGraph-style agent pipelines
+- **Backend:** FastAPI + Gemini agent pipelines
 - **Database:** Supabase Postgres + pgvector
 - **WhatsApp:** Meta Cloud API webhook
 
@@ -19,15 +35,15 @@ SafeLine is a unified trust & safety platform helping users verify suspicious me
 | Job offer | WHOIS, DNS MX, web search, scam corpus | Flags upfront fees, free-mail domains |
 | Crisis rumor | Fact Check Tools, NewsAPI, GDELT, Nominatim, gov search | `confirmed` / `likely_false` / `outdated` / `unverified` |
 
-## Evaluation results (sample run, 3 cases per agent, no API keys)
+## Evaluation
 
-| Agent | Accuracy | False positive rate | False negative rate |
-|-------|----------|---------------------|---------------------|
-| scam | 1.0 | 0.0 | 0.0 |
-| job_offer | 1.0 | 0.0 | 0.0 |
-| crisis_rumor | 0.667 | 0.0 | 0.333 |
+Manual scenario checks against live agents (web + WhatsApp). Regression fixtures are kept locally under `_private/eval/` (not part of public submission).
 
-Full harness: `python tests/eval/run_eval.py` (65 total cases). Results in `last_run_summary.json` and `eval_runs` table.
+## Security
+
+- Supabase Auth + RLS on user data
+- Agent API: optional Supabase JWT, per-IP/per-user rate limits, browser CSRF protection
+- WhatsApp webhook HMAC + relay secret
 
 ## Demo video script
 

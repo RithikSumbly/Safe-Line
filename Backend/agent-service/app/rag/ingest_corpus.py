@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 _COLLECTION = "scam_corpus"
 _REPO_ROOT = Path(__file__).resolve().parents[4]
-_CORPUS_PATH = _REPO_ROOT / "Backend-tooling" / "rag" / "scam_reference_corpus.json"
+_CORPUS_PATH = _REPO_ROOT / "data" / "scam_reference_corpus.json"
 
 
 def _chunk_text(text: str, max_len: int = 500) -> list[str]:
