@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from typing import Optional, Protocol
 
 from app.chat.orchestrator import HELP_TEXT, handle_chat_message
+from app.core.schemas import ChatMessageResponse
 from app.db.supabase_client import Timer, find_user_by_whatsapp, log_agent_run, save_check_for_user
+from app.whatsapp.classifier import is_chitchat
 from app.whatsapp.formatter import format_chat_response_for_whatsapp
 from app.whatsapp.session import (
     append_chat_turn,
@@ -59,6 +61,17 @@ async def handle_inbound(message: InboundMessage, messenger: Messenger) -> None:
             phone,
             f"Started a new conversation.\n\n{HELP_TEXT}",
         )
+        return
+
+    # Greetings — instant reply without waiting on the LLM orchestrator.
+    if is_chitchat(incoming_text) and not message.image_bytes:
+        help_response = ChatMessageResponse(
+            type="help",
+            session_id=phone,
+            assistant_text=HELP_TEXT,
+        )
+        await messenger.send_text(phone, HELP_TEXT)
+        await append_chat_turn(phone, incoming_text, help_response)
         return
 
     await messenger.send_typing(phone, message.message_id)

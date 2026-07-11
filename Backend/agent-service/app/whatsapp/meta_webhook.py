@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import hmac
 import logging
@@ -119,16 +118,23 @@ async def _download_media(media_id: str) -> bytes:
 
 async def _process_message(phone: str, message_id: str, *, text: str = "", image_bytes: bytes | None = None, pdf_bytes: bytes | None = None) -> None:
     messenger = MetaMessenger()
-    await handle_inbound(
-        InboundMessage(
-            phone=phone,
-            message_id=message_id,
-            text=text,
-            image_bytes=image_bytes,
-            document_bytes=pdf_bytes,
-        ),
-        messenger,
-    )
+    try:
+        await handle_inbound(
+            InboundMessage(
+                phone=phone,
+                message_id=message_id,
+                text=text,
+                image_bytes=image_bytes,
+                document_bytes=pdf_bytes,
+            ),
+            messenger,
+        )
+    except Exception as exc:
+        logger.exception("WhatsApp processing failed for %s: %s", phone[-4:], exc)
+        await messenger.send_text(
+            phone,
+            "Sorry — I couldn't process that message. Please try again.",
+        )
 
 
 def _extract_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -217,14 +223,13 @@ async def receive_webhook(request: Request):
 
         if phone and (text or pdf_bytes or image_bytes):
             logger.info("WhatsApp inbound from %s type=%s", phone[-4:], msg_type)
-            asyncio.create_task(
-                _process_message(
-                    phone,
-                    message_id,
-                    text=text,
-                    image_bytes=image_bytes,
-                    pdf_bytes=pdf_bytes,
-                )
+            # Await processing so HF Space does not drop background tasks before reply.
+            await _process_message(
+                phone,
+                message_id,
+                text=text,
+                image_bytes=image_bytes,
+                pdf_bytes=pdf_bytes,
             )
 
     return {"status": "ok"}
