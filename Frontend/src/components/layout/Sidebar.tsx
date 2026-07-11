@@ -73,8 +73,8 @@ export function Sidebar() {
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     cn(
-      "nav-tip group relative z-10 flex h-10 items-center gap-3 rounded-[8px] px-3 transition-[color,transform] duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
-      "hover:scale-105 hover:text-verified",
+      "nav-tip group relative z-10 flex h-10 items-center gap-3 rounded-[8px] px-3 transition-colors duration-200",
+      "hover:text-verified",
       isActive ? "text-ink" : "text-ink/55",
     );
 

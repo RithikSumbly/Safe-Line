@@ -81,22 +81,28 @@ export function LiveLedgerTicker() {
 
   useEffect(() => {
     const tick = () => {
+      const incoming = nextLedgerItem();
+      setNewId(incoming.id);
       setItems((prev) => {
         const aged = prev.map((item) => ({
           ...item,
           minutesAgo: item.minutesAgo + 1,
         }));
-        const incoming = nextLedgerItem();
-        setNewId(incoming.id);
         return [incoming, ...aged].slice(0, 12);
       });
     };
 
-    const interval = reduced ? null : window.setInterval(tick, 4500);
+    const interval = reduced ? null : window.setInterval(tick, 6000);
     return () => {
       if (interval) clearInterval(interval);
     };
   }, [reduced]);
+
+  useEffect(() => {
+    if (!newId || reduced) return;
+    const timeout = window.setTimeout(() => setNewId(null), 600);
+    return () => clearTimeout(timeout);
+  }, [newId, reduced]);
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
