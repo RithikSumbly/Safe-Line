@@ -57,6 +57,7 @@ async def retrieve_chunks(
             "query_embedding": embedding,
             "match_collection": collection,
             "match_count": limit,
+            "match_jurisdiction": None,
         }
         res = client.rpc("match_document_chunks", params).execute()
         items: list[EvidenceItem] = []

@@ -118,10 +118,6 @@ export function useChatSession() {
           setLocalSessionId(response.session_id);
         }
 
-        if (user) {
-          await saveChatMessage(sid, "user", trimmed, "text");
-        }
-
         const assistantMsg: ThreadMessage = {
           id: newId(),
           role: "assistant",
@@ -136,13 +132,18 @@ export function useChatSession() {
         if (user) {
           const persistType =
             response.type === "error" ? "text" : response.type;
-          await saveChatMessage(
-            response.session_id,
-            "assistant",
-            response.assistant_text,
-            persistType,
-            response.verdict ?? undefined,
-          );
+          try {
+            await saveChatMessage(sid, "user", trimmed, "text");
+            await saveChatMessage(
+              response.session_id,
+              "assistant",
+              response.assistant_text,
+              persistType,
+              response.verdict ?? undefined,
+            );
+          } catch (persistErr) {
+            console.warn("Chat history save failed:", persistErr);
+          }
         }
 
         if (response.verdict && user) {
@@ -162,9 +163,8 @@ export function useChatSession() {
   );
 
   const startNewSession = useCallback(() => {
-    const id = newId();
-    setSessionId(id);
-    setLocalSessionId(id);
+    setSessionId(null);
+    localStorage.removeItem("safeline_chat_session_id");
     setMessages([createWelcomeMessage()]);
     setError(null);
   }, []);

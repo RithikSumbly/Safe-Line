@@ -50,21 +50,24 @@ export function ChatThread({ messages, loading }: ChatThreadProps) {
           !hasUserMessages && "min-h-full flex-1 justify-center",
         )}
       >
-        {welcomeMessage && (
-          <ChatMessage message={welcomeMessage} />
-        )}
-
         {!hasUserMessages ? (
-          <div className="text-center">
-            <h2 className="font-display text-lg text-ink md:text-xl">
-              {CHAT_EMPTY_TITLE}
-            </h2>
-            <p className="mx-auto mt-2 max-w-sm whitespace-pre-line font-sans text-sm leading-relaxed text-ink/55">
-              {CHAT_EMPTY_BLURB}
-            </p>
-          </div>
+          welcomeMessage ? (
+            <div className="mx-auto max-w-md">
+              <ChatMessage message={welcomeMessage} />
+            </div>
+          ) : (
+            <div className="text-center">
+              <h2 className="font-display text-lg text-ink md:text-xl">
+                {CHAT_EMPTY_TITLE}
+              </h2>
+              <p className="mx-auto mt-2 max-w-sm whitespace-pre-line font-sans text-sm leading-relaxed text-ink/55">
+                {CHAT_EMPTY_BLURB}
+              </p>
+            </div>
+          )
         ) : (
           <>
+            {welcomeMessage && <ChatMessage message={welcomeMessage} />}
             {conversationMessages.map((msg) => (
               <ChatMessage key={msg.id} message={msg} />
             ))}

@@ -13,6 +13,27 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
+_GEMINI_SCHEMA_SKIP = frozenset({"default", "default_factory", "title", "$schema"})
+
+
+def _gemini_response_schema(model: type[BaseModel]) -> dict[str, Any]:
+    """Gemini response_schema rejects JSON Schema 'default' keys from Pydantic."""
+    raw = model.model_json_schema()
+
+    def clean(node: Any) -> Any:
+        if isinstance(node, dict):
+            out: dict[str, Any] = {}
+            for key, value in node.items():
+                if key in _GEMINI_SCHEMA_SKIP:
+                    continue
+                out[key] = clean(value)
+            return out
+        if isinstance(node, list):
+            return [clean(item) for item in node]
+        return node
+
+    return clean(raw)
+
 
 class LLMClient(ABC):
     @abstractmethod
@@ -44,7 +65,7 @@ class GeminiClient(LLMClient):
             system_instruction=system,
             generation_config={
                 "response_mime_type": "application/json",
-                "response_schema": schema,
+                "response_schema": _gemini_response_schema(schema),
             },
         )
         response = await model.generate_content_async(user)

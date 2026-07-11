@@ -11,6 +11,10 @@ _MONEY = re.compile(r"(?i)\b(\d[\d,]*)\s*(rupees?|rs\.?|₹)\b|\brupees?\s+(\d[\
 _CREATOR = re.compile(r"(?i)\b(mr\.?\s*beast|mrleast|mr\s*beast|pewdiepie|creator)\b")
 _SUBSCRIBE = re.compile(r"(?i)\bsubscribe\b")
 _BANK = re.compile(r"(?i)\b(bank|kyc|otp|upi|account\s*frozen|card\s*blocked|verify\s*account)\b")
+_LOAN_FEE = re.compile(
+    r"(?i)\b(pre[- ]?approved|personal\s+loan|processing\s+fee|loan\s+disbursal|"
+    r"refundable\s+fee|pay\s+.*\s+via\s+upi)\b"
+)
 _URGENCY = re.compile(r"(?i)\b(urgent|immediately|act\s*now|within\s*\d+\s*(hours?|mins?))\b")
 
 
@@ -38,6 +42,7 @@ def analyze_message_patterns(text: str, urls: list[str] | None = None) -> ScamPa
     has_subscribe = bool(_SUBSCRIBE.search(text))
     has_bank = bool(_BANK.search(text))
     has_urgency = bool(_URGENCY.search(text))
+    has_loan_fee = bool(_LOAN_FEE.search(text))
     has_youtube = "youtube.com" in lower or "youtu.be" in lower
 
     if has_prize or has_money:
@@ -97,6 +102,27 @@ def analyze_message_patterns(text: str, urls: list[str] | None = None) -> ScamPa
                 "Uses a YouTube link as part of a prize claim — not how verified giveaways work"
             )
 
+    if has_loan_fee:
+        profile.tags.append("loan_fee_scam")
+        profile.red_flags.append(
+            "Offers a pre-approved loan but asks for an upfront processing fee via UPI"
+        )
+        profile.red_flags.append(
+            "Legitimate lenders deduct fees from disbursement — they do not ask for advance UPI payments"
+        )
+        profile.evidence.append(
+            EvidenceItem(
+                source_name="RBI — caution on loan fee fraud",
+                source_url="https://www.rbi.org.in/Scripts/BS_PressReleaseDisplay.aspx",
+                supports_claim=False,
+                snippet=(
+                    "Fraudsters pose as lenders offering instant loans and demand upfront "
+                    "processing or insurance fees. RBI-regulated lenders do not ask for "
+                    "advance fees via SMS or UPI to release a loan."
+                ),
+            )
+        )
+
     if has_bank:
         profile.tags.append("bank_impersonation")
         profile.red_flags.append("Uses bank, KYC, OTP, or UPI language typical of phishing")
@@ -121,9 +147,9 @@ def analyze_message_patterns(text: str, urls: list[str] | None = None) -> ScamPa
     high_signals = sum(
         1
         for t in profile.tags
-        if t in ("bank_impersonation", "celebrity_impersonation", "youtube_impersonation")
+        if t in ("bank_impersonation", "celebrity_impersonation", "youtube_impersonation", "loan_fee_scam")
     )
-    if has_bank or (has_prize and has_money and urls):
+    if has_bank or has_loan_fee:
         profile.status = "high_risk"
         profile.confidence = 0.82
     elif has_prize and (has_creator or has_youtube or has_subscribe):
@@ -155,9 +181,9 @@ def _build_explanation(tags: list[str], has_creator: bool, has_youtube: bool) ->
             "The message follows a classic lottery/prize scam pattern: unexpected winnings "
             "plus a simple action (click, subscribe, pay) to collect."
         )
-    if "bank_impersonation" in tags:
+    if "bank_impersonation" in tags or "loan_fee_scam" in tags:
         return (
-            "The message uses banking or KYC language commonly seen in phishing SMS."
+            "The message uses banking or loan language commonly seen in advance-fee fraud."
         )
     return "Several parts of this message match known scam patterns."
 
@@ -172,6 +198,11 @@ def _build_action(tags: list[str], urls: list[str], has_bank: bool) -> str:
         return (
             "Ignore the prize claim. Do not send money or personal details. "
             "Delete the message and warn others in your family group if it was forwarded."
+        )
+    if "loan_fee_scam" in tags:
+        return (
+            "Do not pay any processing fee. Real lenders never ask for upfront UPI payments "
+            "to release a pre-approved loan. Delete the message and block the sender."
         )
     if has_bank:
         return (
@@ -199,6 +230,12 @@ def _build_family_message(
             "This is a lottery-style scam: a message says you won money you never entered for. "
             "Fraudsters hope you'll click or reply. No real organisation pays prizes this way — "
             "please delete it and don't forward."
+        )
+    if "loan_fee_scam" in tags:
+        return (
+            "This is a fake loan message: it says you're pre-approved but asks for an upfront "
+            "fee before any money is sent. Real banks and NBFCs never take processing fees "
+            "via SMS or UPI links. Please delete it and don't pay anything."
         )
     if "bank_impersonation" in tags:
         return (
