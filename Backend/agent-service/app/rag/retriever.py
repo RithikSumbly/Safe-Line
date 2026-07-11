@@ -80,10 +80,13 @@ def _fallback_evidence(collection: str) -> list[EvidenceItem]:
     if collection == "scam_corpus":
         return [
             EvidenceItem(
-                source_name="RBI",
-                source_url="https://www.rbi.org.in/",
+                source_name="FTC — Prize and lottery scams",
+                source_url="https://consumer.ftc.gov/articles/prize-and-lottery-scams",
                 supports_claim=False,
-                snippet="RBI advisories state banks do not ask for KYC updates via SMS links or OTP sharing.",
+                snippet=(
+                    "Unexpected prize messages that ask you to pay, subscribe, or click "
+                    "a link are a common scam — legitimate prizes do not work this way."
+                ),
             ),
         ]
     return []

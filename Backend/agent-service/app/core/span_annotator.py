@@ -14,41 +14,55 @@ def _severity_for_status(status: VerdictStatus) -> SpanSeverity:
     return "pending"
 
 
+# Map red-flag index (1-based tag) to regexes that must match text literally
+_MESSAGE_INDICATORS: list[tuple[re.Pattern[str], int | None]] = [
+    (re.compile(r"(?i)\b(won|winner|congratulations|congrats|prize|lottery)\b"), 1),
+    (re.compile(r"(?i)\b\d[\d,]*\s*(rupees?|rs\.?)\b"), 1),
+    (re.compile(r"(?i)youtube\.com[^\s]*"), 2),
+    (re.compile(r"(?i)\byoutu\.be[^\s]*"), 2),
+    (re.compile(r"(?i)\bsubscribe\b"), 2),
+    (re.compile(r"(?i)\b(mr\.?\s*beast|mrleast)\b"), 2),
+    (re.compile(r"(?i)\b(kyc|otp|upi|account\s*frozen)\b"), 3),
+    (re.compile(r"https?://[^\s]+", re.I), None),
+]
+
+
 def _heuristic_spans(
     input_text: str,
     red_flags: list[str],
     status: VerdictStatus,
 ) -> list[FlaggedSpan]:
-    """Fallback when LLM span annotation is unavailable — only exact phrase matches."""
+    """Highlight phrases that literally appear in the message."""
     severity = _severity_for_status(status)
     spans: list[FlaggedSpan] = []
-    lowered = input_text.lower()
-    tag = 1
+    used_ranges: list[tuple[int, int]] = []
 
-    for flag in red_flags[:6]:
-        # Try progressively shorter word sequences from the red-flag description
-        words = re.findall(r"[A-Za-z0-9']+", flag)
-        matched = False
-        for length in range(min(6, len(words)), 1, -1):
-            for start in range(len(words) - length + 1):
-                phrase = " ".join(words[start : start + length])
-                if len(phrase) < 8:
+    def add_span(start: int, end: int, tag: int) -> None:
+        if any(not (end <= s or start >= e) for s, e in used_ranges):
+            return
+        spans.append(
+            FlaggedSpan(start=start, end=end, tag=tag, severity=severity)
+        )
+        used_ranges.append((start, end))
+
+    tag_for_generic = 1
+    for pattern, fixed_tag in _MESSAGE_INDICATORS:
+        tag = fixed_tag or min(tag_for_generic, max(len(red_flags), 1))
+        for m in pattern.finditer(input_text):
+            add_span(m.start(), m.end(), tag)
+        if fixed_tag is None and pattern.search(input_text):
+            tag_for_generic += 1
+
+    # Fallback: if nothing matched, tie tags to red_flag order using short literals from flags
+    if not spans:
+        for i, flag in enumerate(red_flags[:4], start=1):
+            for token in re.findall(r"[A-Za-z0-9.]{4,}", flag):
+                if len(token) < 4:
                     continue
-                idx = lowered.find(phrase.lower())
+                idx = input_text.lower().find(token.lower())
                 if idx >= 0:
-                    spans.append(
-                        FlaggedSpan(
-                            start=idx,
-                            end=idx + len(phrase),
-                            tag=tag,
-                            severity=severity,
-                        )
-                    )
-                    tag += 1
-                    matched = True
+                    add_span(idx, idx + len(token), i)
                     break
-            if matched:
-                break
 
     return spans
 
@@ -73,7 +87,7 @@ async def annotate_spans(
             user=(
                 f"Input text:\n{input_text}\n\n"
                 f"Status: {status}\n"
-                f"Red flags:\n" + "\n".join(f"- {r}" for r in red_flags)
+                f"Red flags:\n" + "\n".join(f"{i+1}. {r}" for i, r in enumerate(red_flags))
             ),
             schema=SpanAnnotationResult,
         )
@@ -81,6 +95,7 @@ async def annotate_spans(
             s
             for s in result.flagged_spans
             if 0 <= s.start < s.end <= len(input_text)
+            and input_text[s.start : s.end].strip()
         ]
         if valid:
             return valid
