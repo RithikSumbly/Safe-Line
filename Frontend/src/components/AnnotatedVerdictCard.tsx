@@ -152,35 +152,36 @@ export function AnnotatedVerdictCard({
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-2.5 md:px-6">
-        <div className="min-w-0 flex-1">
-          <span className="kicker">Filed verdict</span>
-          <span className="mt-1 block font-mono text-[10px] text-ink/40">
-            {verdict.agent.replace("_", " ")} · risk {verdict.risk_score}
-          </span>
-        </div>
-        <div className="relative h-14 w-14 shrink-0">
+      <div className="flex items-center justify-between border-b border-line px-5 py-2.5 md:px-6">
+        <span className="kicker">Filed verdict</span>
+        <span className="font-mono text-[10px] text-ink/40">
+          {verdict.agent.replace("_", " ")} · risk {verdict.risk_score}
+        </span>
+      </div>
+
+      <div className="relative p-5 md:p-6 md:pt-7">
+        <div className="pointer-events-none absolute -top-3 right-4 h-[72px] w-[72px]">
           {isHighRisk && ready && (
             <span
-              className="pointer-events-none absolute inset-0 rounded-full border-2 border-risk/40 animate-[risk-ring-pulse_2s_ease-in-out_infinite]"
+              className="absolute inset-0 rounded-full border-2 border-risk/40 animate-[risk-ring-pulse_2s_ease-in-out_infinite]"
               aria-hidden
             />
           )}
           {stamp.color === "verified" && ready && (
             <span
-              className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_18px_rgba(30,111,92,0.35)]"
+              className="absolute inset-0 rounded-full shadow-[0_0_18px_rgba(30,111,92,0.35)]"
               aria-hidden
             />
           )}
           {animate && ready && !reduced && (
             <span
-              className="pointer-events-none absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full bg-alive/25 animate-[stamp-ripple_0.45s_ease-out_forwards]"
+              className="absolute left-1/2 top-1/2 h-[72px] w-[72px] rounded-full bg-alive/25 animate-[stamp-ripple_0.45s_ease-out_forwards]"
               aria-hidden
             />
           )}
           <div
             className={cn(
-              "stamp-grain relative flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-double text-center",
+              "stamp-grain relative flex h-[72px] w-[72px] items-center justify-center rounded-full border-4 border-double text-center",
               STAMP_COLORS[stamp.color],
               animate &&
                 ready &&
@@ -191,20 +192,18 @@ export function AnnotatedVerdictCard({
             style={animate && !ready ? { opacity: 0 } : undefined}
             aria-label={`Verdict: ${stamp.label}`}
           >
-            <span className="px-0.5 font-mono text-[8px] font-medium leading-tight tracking-wide">
+            <span className="px-1 font-mono text-[9px] font-medium leading-tight tracking-wide">
               {stamp.label}
             </span>
           </div>
         </div>
-      </div>
 
-      <div className="relative p-5 md:p-6">
-        <p className="mb-4 font-sans text-sm leading-relaxed text-ink/70">
+        <p className="mb-4 pr-16 font-sans text-sm leading-relaxed text-ink/70">
           {STATUS_SUMMARY[verdict.status]}
         </p>
 
         {verdict.explanation && (
-          <div className="mb-6">
+          <div className="mb-6 pr-16">
             <h3 className="kicker mb-2">Summary</h3>
             <p className="font-sans text-sm leading-relaxed text-ink">
               {verdict.explanation}
@@ -212,7 +211,7 @@ export function AnnotatedVerdictCard({
           </div>
         )}
 
-        <div className="mb-6">
+        <div className="mb-6 pr-16">
           <h3 className="kicker mb-2">Your message</h3>
           {showHighlights && (
             <p className="mb-2 font-mono text-[10px] text-ink/45">
@@ -423,7 +422,7 @@ export function AnnotatedVerdictCard({
         </div>
 
         {verdict.agent === "scam" && familyRewrite && (
-          <div className="mb-6 border-t border-line pt-6">
+          <div className="mb-6 border-t border-line pt-6 pr-16">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="kicker">Message for family</h3>
               <button

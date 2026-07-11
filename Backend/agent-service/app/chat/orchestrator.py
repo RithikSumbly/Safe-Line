@@ -31,6 +31,16 @@ HELP_TEXT = (
 )
 
 LOC_RE = re.compile(r"\b(\d{1,3}\.\d+,\s*\d{1,3}\.\d+)\b")
+_GREETING_ONLY = re.compile(r"(?i)^(hi|hello|hey|help|start)[\s!.?]*$")
+_CHECK_HINTS = re.compile(
+    r"(?i)\b(won|lottery|prize|claim|otp|kyc|upi|rupee|rs\.?\s*\d|verify|scam|phish|"
+    r"subscribe|click|fake|job|offer|rumou?r|flood|dam|forward|suspicious)\b"
+)
+_TOOL_MAP: dict[str, ChatToolName] = {
+    "scam": "check_scam_message",
+    "job_offer": "check_job_offer",
+    "crisis_rumor": "check_crisis_rumor",
+}
 
 
 class ToolCallArgs(BaseModel):
@@ -71,6 +81,72 @@ def _detect_location(text: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
+def _is_greeting_only(text: str) -> bool:
+    return bool(_GREETING_ONLY.match(text.strip()))
+
+
+def _looks_like_content_to_check(text: str) -> bool:
+    stripped = text.strip()
+    if not stripped or _is_greeting_only(stripped):
+        return False
+    if len(stripped) >= 30:
+        return True
+    if extract_urls(stripped):
+        return True
+    return bool(_CHECK_HINTS.search(stripped) and len(stripped) >= 15)
+
+
+def _resolve_tool_name(content: str, router_hint) -> Optional[ChatToolName]:
+    tool_name = _TOOL_MAP.get(router_hint.intent)
+    if tool_name and router_hint.confidence >= 0.4:
+        return tool_name
+    if _looks_like_content_to_check(content):
+        if router_hint.intent in _TOOL_MAP and router_hint.confidence >= 0.25:
+            return _TOOL_MAP[router_hint.intent]
+        if extract_urls(content) or _CHECK_HINTS.search(content):
+            return "check_scam_message"
+    return None
+
+
+async def _run_tool_check(
+    tool_name: ChatToolName,
+    text: str,
+    content: str,
+    history: list[ChatHistoryItem],
+    session_id: str,
+    intro: str = "Running a live check on that message now.",
+) -> ChatMessageResponse:
+    urls = extract_urls(text)
+    check_text = content
+    check_url = urls[0] if urls else None
+    check_email = extract_email(check_text)
+    check_location = _detect_location(text) or _detect_location(check_text)
+
+    try:
+        verdict: AnnotatedVerdict = await execute_tool(
+            tool_name,
+            check_text,
+            url=check_url,
+            email=check_email,
+            location=check_location,
+        )
+    except Exception as exc:
+        logger.exception("Tool execution failed: %s", exc)
+        return ChatMessageResponse(
+            type="error",
+            session_id=session_id,
+            assistant_text="I couldn't complete the check right now. Please try again.",
+        )
+
+    return ChatMessageResponse(
+        type="verdict",
+        session_id=session_id,
+        tool_used=tool_name,
+        assistant_text=intro,
+        verdict=verdict,
+    )
+
+
 async def handle_chat_message(
     text: str,
     history: list[ChatHistoryItem],
@@ -87,6 +163,23 @@ async def handle_chat_message(
         )
 
     router_hint = await classify_intent(content)
+
+    if _is_greeting_only(text):
+        return ChatMessageResponse(
+            type="help",
+            session_id=session_id,
+            assistant_text=HELP_TEXT,
+        )
+
+    forced_tool = _resolve_tool_name(content, router_hint)
+    if forced_tool:
+        return await _run_tool_check(
+            forced_tool,
+            text,
+            content,
+            history,
+            session_id,
+        )
 
     history_block = "\n".join(
         f"{m.role}: {m.content[:500]}" for m in history[-8:]
@@ -137,26 +230,15 @@ async def handle_chat_message(
         )
     except Exception as exc:
         logger.warning("Orchestrator LLM failed: %s", exc)
-        if router_hint.confidence >= 0.6 and router_hint.intent != "general_help":
-            tool_map: dict[str, ChatToolName] = {
-                "scam": "check_scam_message",
-                "job_offer": "check_job_offer",
-                "crisis_rumor": "check_crisis_rumor",
-            }
-            tool_name = tool_map.get(router_hint.intent)
-            if tool_name:
-                decision = OrchestratorDecision(
-                    action="call_tool",
-                    tool_name=tool_name,
-                    tool_args=ToolCallArgs(
-                        text=content,
-                        url=urls[0] if urls else None,
-                        email=extract_email(content),
-                        location=_detect_location(content),
-                    ),
-                    assistant_text="Running a live check on that message now.",
-                )
-        elif re.match(r"(?i)^(hi|hello|hey|help|start)\b", text.strip()):
+        if forced_tool := _resolve_tool_name(content, router_hint):
+            return await _run_tool_check(
+                forced_tool,
+                text,
+                content,
+                history,
+                session_id,
+            )
+        if _is_greeting_only(text.strip()):
             return ChatMessageResponse(
                 type="help",
                 session_id=session_id,
@@ -179,6 +261,15 @@ async def handle_chat_message(
                 session_id=session_id,
                 assistant_text=OFF_SCOPE_REPLY,
             )
+        if decision.reply_type == "help" and _looks_like_content_to_check(content):
+            if forced_tool := _resolve_tool_name(content, router_hint):
+                return await _run_tool_check(
+                    forced_tool,
+                    text,
+                    content,
+                    history,
+                    session_id,
+                )
         msg_type: ChatMessageType = (
             "help" if decision.reply_type == "help" else "clarification"
         )
@@ -230,31 +321,11 @@ async def handle_chat_message(
 
     args = decision.tool_args
     check_text = args.text or content
-    check_url = args.url or (urls[0] if urls else None)
-    check_email = args.email or extract_email(check_text)
-    check_location = args.location or _detect_location(text) or _detect_location(check_text)
-
-    try:
-        verdict: AnnotatedVerdict = await execute_tool(
-            decision.tool_name,
-            check_text,
-            url=check_url,
-            email=check_email,
-            location=check_location,
-        )
-    except Exception as exc:
-        logger.exception("Tool execution failed: %s", exc)
-        return ChatMessageResponse(
-            type="error",
-            session_id=session_id,
-            assistant_text="I couldn't complete the check right now. Please try again.",
-        )
-
-    intro = decision.assistant_text.strip() or "Here's what I found from live sources:"
-    return ChatMessageResponse(
-        type="verdict",
-        session_id=session_id,
-        tool_used=decision.tool_name,
-        assistant_text=intro,
-        verdict=verdict,
+    return await _run_tool_check(
+        decision.tool_name,
+        text,
+        check_text,
+        history,
+        session_id,
+        intro=decision.assistant_text.strip() or "Here's what I found from live sources:",
     )

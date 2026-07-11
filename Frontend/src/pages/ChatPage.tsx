@@ -16,7 +16,7 @@ export function ChatPage() {
   } = useChatSession();
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] min-h-[520px] flex-col">
+    <div className="flex h-[calc(100svh-4rem)] min-h-0 flex-col overflow-hidden">
       <header className="border-b border-line px-4 py-4 md:px-6">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
           <div>
@@ -29,7 +29,7 @@ export function ChatPage() {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 gap-4 px-4 py-4 md:px-6">
+      <div className="flex min-h-0 flex-1 gap-4 overflow-hidden px-4 py-4 md:px-6">
         <ChatSessionList
           activeSessionId={sessionId}
           onSelect={loadSession}

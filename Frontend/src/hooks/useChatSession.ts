@@ -8,6 +8,7 @@ import {
   saveChatMessage,
   setLocalSessionId,
 } from "@/lib/chatSessions";
+import { createWelcomeMessage, WELCOME_MESSAGE_ID } from "@/lib/chatCopy";
 import { saveCheck } from "@/lib/checks";
 import type {
   ChatHistoryItem,
@@ -20,7 +21,11 @@ function newId(): string {
 
 function toHistory(messages: ThreadMessage[]): ChatHistoryItem[] {
   return messages
-    .filter((m) => m.role === "user" || m.role === "assistant")
+    .filter(
+      (m) =>
+        (m.role === "user" || m.role === "assistant") &&
+        m.id !== WELCOME_MESSAGE_ID,
+    )
     .map((m) => ({
       role: m.role,
       content: m.verdict
@@ -29,10 +34,15 @@ function toHistory(messages: ThreadMessage[]): ChatHistoryItem[] {
     }));
 }
 
+function initialMessages(loaded: ThreadMessage[]): ThreadMessage[] {
+  if (loaded.length === 0) return [createWelcomeMessage()];
+  return loaded;
+}
+
 export function useChatSession() {
   const { user } = useAuth();
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ThreadMessage[]>([]);
+  const [messages, setMessages] = useState<ThreadMessage[]>([createWelcomeMessage()]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
@@ -65,12 +75,14 @@ export function useChatSession() {
         try {
           const loaded = await loadChatMessages(stored);
           setSessionId(stored);
-          setMessages(loaded);
+          setMessages(initialMessages(loaded));
         } catch {
           setSessionId(null);
+          setMessages([createWelcomeMessage()]);
         }
       } else if (stored && !user) {
         setSessionId(stored);
+        setMessages([createWelcomeMessage()]);
       }
       setBootstrapped(true);
     };
@@ -151,7 +163,7 @@ export function useChatSession() {
     const id = newId();
     setSessionId(id);
     setLocalSessionId(id);
-    setMessages([]);
+    setMessages([createWelcomeMessage()]);
     setError(null);
   }, []);
 
@@ -163,12 +175,12 @@ export function useChatSession() {
       if (user) {
         try {
           const loaded = await loadChatMessages(id);
-          setMessages(loaded);
+          setMessages(initialMessages(loaded));
         } catch {
-          setMessages([]);
+          setMessages([createWelcomeMessage()]);
         }
       } else {
-        setMessages([]);
+        setMessages([createWelcomeMessage()]);
       }
     },
     [user],

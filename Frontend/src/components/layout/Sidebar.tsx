@@ -98,28 +98,31 @@ export function Sidebar() {
       onMouseLeave={() => setHovered(false)}
       aria-label="Primary navigation"
     >
-      <div className="flex items-center justify-between px-3 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-2 py-2">
         <span
           className={cn(
             "font-mono text-[9px] uppercase tracking-[0.2em] text-alive transition-opacity",
-            expanded ? "opacity-100" : "opacity-0",
+            expanded ? "opacity-100 pl-1" : "sr-only",
           )}
         >
           Desk
         </span>
         <button
           type="button"
-          onClick={togglePin}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            togglePin();
+          }}
           className={cn(
-            "flex h-8 w-8 items-center justify-center rounded-[6px] text-ink/45 transition-colors hover:bg-alive/10 hover:text-alive",
-            expanded ? "opacity-100" : "mx-auto opacity-100",
+            "relative z-20 flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-line/80 bg-paper text-ink/55 transition-colors hover:border-alive/40 hover:bg-alive/10 hover:text-alive active:scale-95",
+            !expanded && "mx-auto",
           )}
           aria-label={pinned ? "Unpin sidebar" : "Pin sidebar"}
         >
           {pinned ? (
-            <PinOff className="h-4 w-4" strokeWidth={1.5} />
+            <PinOff className="h-5 w-5" strokeWidth={1.75} />
           ) : (
-            <Pin className="h-4 w-4" strokeWidth={1.5} />
+            <Pin className="h-5 w-5" strokeWidth={1.75} />
           )}
         </button>
       </div>
