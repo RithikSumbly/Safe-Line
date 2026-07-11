@@ -28,6 +28,7 @@ router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 _background_tasks: set[asyncio.Task[None]] = set()
 
 _META_TIMEOUT = httpx.Timeout(connect=60.0, read=60.0, write=30.0, pool=60.0)
+_RELAY_TIMEOUT = httpx.Timeout(connect=20.0, read=60.0, write=30.0, pool=20.0)
 _meta_client: httpx.AsyncClient | None = None
 
 
@@ -156,7 +157,7 @@ async def _post_via_relay(payload: dict[str, Any]) -> tuple[int, str, str]:
         "to": payload["to"],
         "body": payload["text"]["body"],
     }
-    async with httpx.AsyncClient(timeout=httpx.Timeout(connect=20.0, read=60.0)) as client:
+    async with httpx.AsyncClient(timeout=_RELAY_TIMEOUT) as client:
         res = await client.post(
             relay_url,
             headers={
@@ -305,7 +306,7 @@ class MetaMessenger(Messenger):
         if not settings.meta_whatsapp_token or not settings.meta_phone_number_id or not message_id:
             return
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+            async with httpx.AsyncClient(timeout=_META_TIMEOUT) as client:
                 await client.post(
                     f"https://graph.facebook.com/v21.0/{settings.meta_phone_number_id}/messages",
                     headers={"Authorization": f"Bearer {settings.meta_whatsapp_token}"},
