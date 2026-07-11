@@ -9,7 +9,9 @@ from app.agents.crisis_rumor import run_crisis_agent
 from app.agents.job_offer import run_job_agent
 from app.agents.scam import run_scam_agent
 from app.config import get_settings
-from app.core.schemas import AgentType, AnnotatedVerdict, CheckInput
+from app.chat.agent_tools import new_session_id
+from app.chat.orchestrator import handle_chat_message
+from app.core.schemas import AgentType, AnnotatedVerdict, ChatMessageRequest, ChatMessageResponse, CheckInput
 from app.db.supabase_client import Timer, log_agent_run
 from app.router_agent import classify_intent
 from app.whatsapp.meta_webhook import router as whatsapp_router
@@ -51,6 +53,28 @@ async def route_agent(inp: CheckInput):
     if result.clarifying_question and result.confidence < 0.6:
         raise HTTPException(status_code=422, detail=result.clarifying_question)
     return result
+
+
+@app.post("/chat/message", response_model=ChatMessageResponse)
+async def chat_message(req: ChatMessageRequest):
+    session_id = req.session_id or new_session_id()
+    if not req.text.strip():
+        return ChatMessageResponse(
+            type="clarification",
+            session_id=session_id,
+            assistant_text="Send me the suspicious message you'd like checked.",
+        )
+    response = await handle_chat_message(req.text, req.history, session_id)
+    if response.type == "verdict" and response.verdict:
+        timer = Timer()
+        await log_agent_run(
+            agent=response.verdict.agent,
+            channel="web",
+            input_text=req.text,
+            verdict=response.verdict,
+            latency_ms=timer.elapsed_ms,
+        )
+    return response
 
 
 @app.post("/agents/{agent}", response_model=AnnotatedVerdict)

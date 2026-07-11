@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { AnnotatedVerdictCard } from "@/components/AnnotatedVerdictCard";
-import { CheckingSourcesLoader } from "@/components/CheckingSourcesLoader";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { MOCK_VERDICTS } from "@/data/mockVerdicts";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
-import { checkContent } from "@/lib/checkContent";
 import type { AnnotatedVerdict } from "@/types/agent";
 
 const CYCLE_EXAMPLES = [
@@ -20,12 +18,8 @@ export function HeroLiveDemo() {
   const reduced = usePrefersReducedMotion();
   const [displayText, setDisplayText] = useState("");
   const [mockVerdict, setMockVerdict] = useState<AnnotatedVerdict | null>(null);
-  const [liveVerdict, setLiveVerdict] = useState<AnnotatedVerdict | null>(null);
-  const [loading, setLoading] = useState(false);
   const [checkKey, setCheckKey] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [userEdited, setUserEdited] = useState(false);
-  const [text, setText] = useState(CYCLE_EXAMPLES[0].input_text);
   const typewriterRef = useRef<number | null>(null);
   const cycleRef = useRef<number | null>(null);
 
@@ -66,8 +60,6 @@ export function HeroLiveDemo() {
     (idx: number) => {
       const example = CYCLE_EXAMPLES[idx];
       setMockVerdict(null);
-      setLiveVerdict(null);
-      setText(example.input_text);
       runTypewriter(example.input_text, () => {
         setMockVerdict(example);
         setCheckKey((k) => k + 1);
@@ -77,7 +69,7 @@ export function HeroLiveDemo() {
   );
 
   useEffect(() => {
-    if (paused || userEdited) {
+    if (paused) {
       clearTimers();
       return;
     }
@@ -91,63 +83,34 @@ export function HeroLiveDemo() {
     }, CYCLE_MS);
 
     return clearTimers;
-  }, [paused, userEdited, showExample, clearTimers]);
-
-  const runDemo = async () => {
-    setPaused(true);
-    clearTimers();
-    setLoading(true);
-    setMockVerdict(null);
-    setLiveVerdict(null);
-    try {
-      const result = await checkContent("scam", { text });
-      setLiveVerdict(result);
-      setCheckKey((k) => k + 1);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onTextChange = (value: string) => {
-    setUserEdited(true);
-    setPaused(true);
-    clearTimers();
-    setText(value);
-    setDisplayText(value);
-    setMockVerdict(null);
-    setLiveVerdict(null);
-  };
-
-  const verdict = liveVerdict ?? mockVerdict;
-  const textareaValue = userEdited ? text : displayText || text;
+  }, [paused, showExample, clearTimers]);
 
   return (
     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-12">
       <div>
         <p className="kicker">Live intake</p>
         <p className="mt-2 font-sans text-sm text-ink/55">
-          Paste a suspicious message. Sources are checked before a verdict is
-          filed.
+          Paste anything suspicious in chat — SafeLine picks the right live
+          check and returns a cited verdict card.
         </p>
-        <Textarea
-          value={textareaValue}
-          onChange={(e) => onTextChange(e.target.value)}
-          onFocus={() => {
-            setPaused(true);
-            clearTimers();
-          }}
-          className="mt-4 min-h-[120px] bg-paper"
-          aria-label="Demo message input"
-        />
-        <Button onClick={runDemo} disabled={loading} className="mt-4">
-          Check this message
+        <div className="mt-4 rounded-[10px] border border-line bg-paper px-4 py-3 font-sans text-sm leading-relaxed text-ink/70 min-h-[120px]">
+          {displayText || CYCLE_EXAMPLES[0].input_text}
+        </div>
+        <Button asChild className="mt-4">
+          <Link to="/chat">Open SafeLine chat</Link>
         </Button>
+        <button
+          type="button"
+          onClick={() => setPaused((p) => !p)}
+          className="ml-4 font-mono text-[10px] text-ink/40 underline underline-offset-4 hover:text-ink"
+        >
+          {paused ? "Resume preview" : "Pause preview"}
+        </button>
       </div>
 
       <div className="min-h-[200px]">
-        {loading && <CheckingSourcesLoader />}
-        {verdict && !loading && (
-          <AnnotatedVerdictCard key={checkKey} verdict={verdict} animate />
+        {mockVerdict && (
+          <AnnotatedVerdictCard key={checkKey} verdict={mockVerdict} animate />
         )}
       </div>
     </div>

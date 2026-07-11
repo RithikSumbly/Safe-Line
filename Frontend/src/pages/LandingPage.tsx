@@ -18,7 +18,7 @@ const STEPS = [
 
 const CHECKERS = [
   {
-    to: "/scam",
+    to: "/chat",
     num: "01",
     title: "Scam message",
     desc: "Phishing SMS, fake bank alerts, impersonation links",
@@ -26,7 +26,7 @@ const CHECKERS = [
     numColor: "text-risk",
   },
   {
-    to: "/jobs",
+    to: "/chat",
     num: "02",
     title: "Fake job offer",
     desc: "Upfront-fee offers, impersonated employer recruiting",
@@ -34,7 +34,7 @@ const CHECKERS = [
     numColor: "text-pending",
   },
   {
-    to: "/crisis",
+    to: "/chat",
     num: "03",
     title: "Crisis rumor",
     desc: "Forwarded emergency claims vs official bulletins",
@@ -60,7 +60,7 @@ export function LandingPage() {
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
               <Button asChild>
-                <Link to="/scam">Check a message</Link>
+                <Link to="/chat">Check a message</Link>
               </Button>
               <a
                 href={`https://wa.me/${WHATSAPP_NUMBER}`}
@@ -130,7 +130,7 @@ export function LandingPage() {
           <ScrollReveal>
             <p className="kicker">Index</p>
             <h2 className="mt-2 font-display text-2xl text-ink md:text-[1.75rem]">
-              Four checkers, one desk
+              One chat, three live checks
             </h2>
           </ScrollReveal>
           <div className="mt-6 border-t border-line">

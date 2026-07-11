@@ -1,13 +1,11 @@
 import {
-  Briefcase,
   Home,
   Info,
   LayoutDashboard,
   MessageCircle,
+  MessageSquare,
   Pin,
   PinOff,
-  Radio,
-  ShieldAlert,
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -17,9 +15,7 @@ import { cn } from "@/lib/cn";
 
 const NAV_MAIN = [
   { to: "/", label: "Home", icon: Home, end: true },
-  { to: "/scam", label: "Scams", icon: ShieldAlert },
-  { to: "/jobs", label: "Jobs", icon: Briefcase },
-  { to: "/crisis", label: "Rumors", icon: Radio },
+  { to: "/chat", label: "Check a message", icon: MessageSquare },
 ] as const;
 
 const NAV_BOTTOM = [

@@ -57,6 +57,63 @@ export type Database = {
         };
         Relationships: [];
       };
+      chat_sessions: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          title: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          title?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          title?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      chat_messages: {
+        Row: {
+          id: string;
+          session_id: string;
+          role: string;
+          content: string | null;
+          message_type: string;
+          verdict: Json | null;
+          agent: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          role: string;
+          content?: string | null;
+          message_type?: string;
+          verdict?: Json | null;
+          agent?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          role?: string;
+          content?: string | null;
+          message_type?: string;
+          verdict?: Json | null;
+          agent?: string | null;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

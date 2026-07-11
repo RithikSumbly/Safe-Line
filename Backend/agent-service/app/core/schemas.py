@@ -70,3 +70,29 @@ class RouterResult(BaseModel):
 
 class SpanAnnotationResult(BaseModel):
     flagged_spans: list[FlaggedSpan]
+
+
+ChatRole = Literal["user", "assistant", "system"]
+ChatMessageType = Literal["text", "verdict", "clarification", "help", "error"]
+ChatToolName = Literal[
+    "check_scam_message", "check_job_offer", "check_crisis_rumor"
+]
+
+
+class ChatHistoryItem(BaseModel):
+    role: ChatRole
+    content: str
+
+
+class ChatMessageRequest(BaseModel):
+    session_id: Optional[str] = None
+    text: str
+    history: list[ChatHistoryItem] = Field(default_factory=list)
+
+
+class ChatMessageResponse(BaseModel):
+    type: ChatMessageType
+    session_id: str
+    tool_used: Optional[ChatToolName] = None
+    assistant_text: str
+    verdict: Optional[AnnotatedVerdict] = None

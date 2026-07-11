@@ -105,3 +105,44 @@ export function toSuperscript(n: number): string {
     .map((d) => SUPER_SCRIPT[Number(d)] ?? d)
     .join("");
 }
+
+export type ChatRole = "user" | "assistant" | "system";
+export type ChatMessageType =
+  | "text"
+  | "verdict"
+  | "clarification"
+  | "help"
+  | "error";
+
+export type ChatToolName =
+  | "check_scam_message"
+  | "check_job_offer"
+  | "check_crisis_rumor";
+
+export interface ChatHistoryItem {
+  role: ChatRole;
+  content: string;
+}
+
+export interface ChatMessageResponse {
+  type: ChatMessageType;
+  session_id: string;
+  tool_used?: ChatToolName | null;
+  assistant_text: string;
+  verdict?: AnnotatedVerdict | null;
+}
+
+export interface ThreadMessage {
+  id: string;
+  role: ChatRole;
+  content: string;
+  messageType: ChatMessageType;
+  verdict?: AnnotatedVerdict;
+  createdAt: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string | null;
+  updatedAt: string;
+}
