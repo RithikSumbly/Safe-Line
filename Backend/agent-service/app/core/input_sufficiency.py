@@ -46,9 +46,37 @@ def is_insufficient_for_check(text: str) -> bool:
 
 
 def looks_like_check_request(text: str) -> bool:
-    return bool(
-        re.search(r"(?i)\b(scam|fake|phish|legit|trust|verify|check\s+this)\??", text or "")
-    )
+    stripped = (text or "").strip()
+    if re.search(
+        r"(?i)\b(?:is\s+this|should\s+i\s+trust|can\s+you\s+check|please\s+check)\b",
+        stripped,
+    ):
+        return True
+    if re.search(r"(?i)\b(?:scam|fake|legit|phish(?:ing)?|verify)\s*\?", stripped):
+        return True
+    return bool(re.search(r"(?i)^check\s+this\b", stripped))
+
+
+_SAFETY_QUESTION = re.compile(
+    r"(?i)\b("
+    r"how\s+(?:does|do|can|to)|what\s+(?:is|are)|why\s+(?:do|does)|"
+    r"explain|tell\s+me\s+(?:about|how)|ways\s+to|how\s+can\s+i"
+    r")\b"
+)
+
+
+def looks_like_safety_question(text: str) -> bool:
+    """Educational trust-safety question without a specific message to verify."""
+    stripped = (text or "").strip()
+    if not stripped:
+        return False
+    if re.search(r"(?i)https?://|www\.", stripped):
+        return False
+    if _SUBSTANCE.search(stripped) and len(stripped) >= 40:
+        return False
+    if not _SAFETY_QUESTION.search(stripped):
+        return False
+    return is_insufficient_for_check(stripped)
 
 
 def has_prompt_injection(text: str) -> bool:

@@ -9,7 +9,11 @@ from pydantic import BaseModel, Field
 from app.chat.agent_tools import answer_safety_question, execute_tool, extract_email
 from app.chat.scope_guardrails import OFF_SCOPE_REPLY, is_off_topic
 from app.core.llm_client import get_llm_client
-from app.core.input_sufficiency import is_insufficient_for_check, looks_like_check_request
+from app.core.input_sufficiency import (
+    is_insufficient_for_check,
+    looks_like_check_request,
+    looks_like_safety_question,
+)
 from app.core.prompt_guards import analysis_prompt
 from app.core.schemas import (
     AnnotatedVerdict,
@@ -75,6 +79,10 @@ class OrchestratorDecision(BaseModel):
 def _content_to_check(text: str, history: list[ChatHistoryItem]) -> str:
     """Use latest user text, or refer back to prior user message for follow-ups."""
     stripped = text.strip()
+    if looks_like_safety_question(stripped):
+        return stripped
+    if is_insufficient_for_check(stripped) and not looks_like_check_request(stripped):
+        return stripped
     if len(stripped) >= 40:
         return stripped
     for item in reversed(history):
@@ -95,6 +103,8 @@ def _is_greeting_only(text: str) -> bool:
 def _looks_like_content_to_check(text: str) -> bool:
     stripped = text.strip()
     if not stripped or _is_greeting_only(stripped):
+        return False
+    if looks_like_safety_question(stripped):
         return False
     if is_insufficient_for_check(stripped):
         return looks_like_check_request(stripped)
@@ -163,6 +173,23 @@ async def handle_chat_message(
     history: list[ChatHistoryItem],
     session_id: str,
 ) -> ChatMessageResponse:
+    if looks_like_safety_question(text):
+        try:
+            answer = await answer_safety_question(text)
+        except Exception as exc:
+            logger.exception("Safety Q&A failed: %s", exc)
+            return ChatMessageResponse(
+                type="error",
+                session_id=session_id,
+                assistant_text="I couldn't answer that right now. Try pasting the message to check.",
+            )
+        return ChatMessageResponse(
+            type="text",
+            session_id=session_id,
+            tool_used="answer_safety_question",
+            assistant_text=answer,
+        )
+
     urls = extract_urls(text)
     content = _content_to_check(text, history)
 
