@@ -4,8 +4,6 @@ import {
   LayoutDashboard,
   MessageCircle,
   Phone,
-  Pin,
-  PinOff,
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -32,7 +30,7 @@ const NAV_BOTTOM = [
 
 export function Sidebar() {
   const location = useLocation();
-  const { pinned, expanded, setHovered, togglePin } = useSidebar();
+  const { expanded, setHovered } = useSidebar();
   const itemRefs = useRef<Map<string, HTMLAnchorElement>>(new Map());
   const [pill, setPill] = useState({ top: 0, height: 40, visible: false });
 
@@ -92,36 +90,7 @@ export function Sidebar() {
       onMouseLeave={() => setHovered(false)}
       aria-label="Primary navigation"
     >
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-2 py-2">
-        <span
-          className={cn(
-            "font-mono text-[9px] uppercase tracking-[0.2em] text-alive transition-opacity",
-            expanded ? "opacity-100 pl-1" : "sr-only",
-          )}
-        >
-          Desk
-        </span>
-        <button
-          type="button"
-          onPointerDown={(e) => {
-            e.preventDefault();
-            togglePin();
-          }}
-          className={cn(
-            "relative z-20 flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-line/80 bg-paper text-ink/55 transition-colors hover:border-alive/40 hover:bg-alive/10 hover:text-alive active:scale-95",
-            !expanded && "mx-auto",
-          )}
-          aria-label={pinned ? "Unpin sidebar" : "Pin sidebar"}
-        >
-          {pinned ? (
-            <PinOff className="h-5 w-5" strokeWidth={1.75} />
-          ) : (
-            <Pin className="h-5 w-5" strokeWidth={1.75} />
-          )}
-        </button>
-      </div>
-
-      <nav className="relative flex flex-1 flex-col px-2 pb-4">
+      <nav className="relative flex flex-1 flex-col px-2 pb-4 pt-3">
         {pill.visible && (
           <div
             className="nav-active-pill absolute left-2 right-2 transition-[top,height] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"

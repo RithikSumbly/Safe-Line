@@ -35,7 +35,9 @@ function toHistory(messages: ThreadMessage[]): ChatHistoryItem[] {
 }
 
 function initialMessages(loaded: ThreadMessage[]): ThreadMessage[] {
+  const hasWelcome = loaded.some((m) => m.id === WELCOME_MESSAGE_ID);
   if (loaded.length === 0) return [createWelcomeMessage()];
+  if (!hasWelcome) return [createWelcomeMessage(), ...loaded];
   return loaded;
 }
 
