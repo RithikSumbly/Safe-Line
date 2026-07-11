@@ -40,6 +40,25 @@ Root [`Dockerfile`](../Dockerfile) (HF Space) copies only `Backend/agent-service
 | POST | `/agents/crisis_rumor` | Crisis rumor check |
 | POST | `/agents/route` | Intent classification |
 | GET/POST | `/whatsapp/webhook` | Meta WhatsApp Cloud API |
+| GET | `/whatsapp/status` | WhatsApp config diagnostic (no secrets) |
+
+## WhatsApp webhook setup
+
+Outbound messages (templates) work once `META_WHATSAPP_TOKEN` and `META_PHONE_NUMBER_ID` are set. **Inbound replies** also need a subscribed webhook:
+
+1. In [Meta Developer Console](https://developers.facebook.com/) → your app → **WhatsApp → Configuration**:
+   - **Callback URL:** `https://<your-backend-host>/whatsapp/webhook` (HF Space: `https://celestiallord-safe-line.hf.space/whatsapp/webhook`)
+   - **Verify token:** must match `META_VERIFY_TOKEN` in HF Space secrets (default: `safeline-verify-token`)
+   - Subscribe to **`messages`** field
+2. In HF Space **Settings → Repository secrets**, set:
+   - `META_WHATSAPP_TOKEN` — permanent token from Meta
+   - `META_PHONE_NUMBER_ID` — from WhatsApp → API Setup
+   - `META_VERIFY_TOKEN` — same string as step 1
+   - `META_APP_SECRET` — from App Settings → Basic → **App secret** (must match exactly; trailing spaces break signature verification)
+3. Confirm: `GET https://<host>/whatsapp/status` shows `"ready": true`
+4. Send **hi** to your WhatsApp number — you should get the help menu within a few seconds.
+
+If inbound messages are never answered, check HF Space logs for `Invalid signature` — that means `META_APP_SECRET` is wrong.
 
 ## Environment variables
 

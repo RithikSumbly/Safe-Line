@@ -11,7 +11,12 @@ from app.agents.job_offer import run_job_agent
 from app.agents.scam import run_scam_agent
 from app.core.schemas import AgentType, CheckInput
 from app.db.supabase_client import Timer, find_user_by_whatsapp, log_agent_run, save_check_for_user
-from app.whatsapp.classifier import MessageClassification, classify_message, parse_command
+from app.whatsapp.classifier import (
+    MessageClassification,
+    classify_message,
+    is_chitchat,
+    parse_command,
+)
 from app.whatsapp.formatter import format_verdict_message
 from app.whatsapp.session import get_session, reset_session, upsert_session
 from app.whatsapp.vision import extract_text_from_whatsapp_screenshot
@@ -271,6 +276,16 @@ async def handle_inbound(message: InboundMessage, messenger: Messenger) -> None:
         )
         return
 
+    incoming_text = (message.text or "").strip()
+    if message.image_bytes:
+        incoming_text = await extract_text_from_whatsapp_screenshot(message.image_bytes)
+
+    # Greetings/help — reply immediately instead of waiting on the debounce buffer.
+    if not message.image_bytes and is_chitchat(incoming_text):
+        await messenger.send_text(phone, _help_text())
+        await reset_session(phone)
+        return
+
     # Commands: deterministic routing / flushing
     cmd = parse_command(message.text)
     if cmd:
@@ -310,11 +325,6 @@ async def handle_inbound(message: InboundMessage, messenger: Messenger) -> None:
             return
 
     # Non-command: buffering behavior (text or image).
-    # Extract image text immediately (vision), so flush doesn't redo it.
-    incoming_text = (message.text or "").strip()
-    if message.image_bytes:
-        incoming_text = await extract_text_from_whatsapp_screenshot(message.image_bytes)
-
     item_type = "image" if message.image_bytes else "text"
     buffer_items = list(sess.get("buffer") or [])
     buffer_items.append({"type": item_type, "content": incoming_text, "received_at": _now_iso()})

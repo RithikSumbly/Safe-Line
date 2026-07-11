@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import logging
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from app.config import get_settings
 from app.whatsapp.pipeline import InboundMessage, Messenger, handle_inbound
@@ -17,12 +18,21 @@ router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 
 def _verify_signature(payload: bytes, signature: str | None) -> bool:
     secret = get_settings().meta_app_secret
-    if not secret or not signature:
-        return not secret
+    if not secret:
+        return True
+    if not signature:
+        logger.warning("WhatsApp webhook missing X-Hub-Signature-256 header")
+        return False
     expected = "sha256=" + hmac.new(
         secret.encode(), payload, hashlib.sha256
     ).hexdigest()
-    return hmac.compare_digest(expected, signature)
+    ok = hmac.compare_digest(expected, signature)
+    if not ok:
+        logger.error(
+            "WhatsApp webhook signature mismatch — check META_APP_SECRET matches "
+            "Meta Developer Console → App Settings → Basic → App secret"
+        )
+    return ok
 
 
 class MetaMessenger(Messenger):
@@ -36,7 +46,7 @@ class MetaMessenger(Messenger):
             )
             return
         async with httpx.AsyncClient(timeout=30.0) as client:
-            await client.post(
+            res = await client.post(
                 f"https://graph.facebook.com/v21.0/{settings.meta_phone_number_id}/messages",
                 headers={"Authorization": f"Bearer {settings.meta_whatsapp_token}"},
                 json={
@@ -46,6 +56,12 @@ class MetaMessenger(Messenger):
                     "text": {"body": body},
                 },
             )
+            if res.status_code >= 400:
+                logger.error(
+                    "WhatsApp send failed (%s): %s",
+                    res.status_code,
+                    res.text[:300],
+                )
 
     async def send_typing(self, to: str, message_id: str) -> None:
         settings = get_settings()
@@ -125,6 +141,24 @@ def _extract_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
+@router.get("/status")
+async def whatsapp_status():
+    """Diagnostic: shows whether WhatsApp env vars are configured (no secrets exposed)."""
+    settings = get_settings()
+    return {
+        "webhook_path": "/whatsapp/webhook",
+        "token_configured": bool(settings.meta_whatsapp_token),
+        "phone_number_id_configured": bool(settings.meta_phone_number_id),
+        "verify_token_configured": bool(settings.meta_verify_token),
+        "app_secret_configured": bool(settings.meta_app_secret),
+        "ready": bool(
+            settings.meta_whatsapp_token
+            and settings.meta_phone_number_id
+            and settings.meta_verify_token
+        ),
+    }
+
+
 @router.get("/webhook")
 async def verify_webhook(
     hub_mode: str | None = Query(default=None, alias="hub.mode"),
@@ -138,10 +172,7 @@ async def verify_webhook(
 
 
 @router.post("/webhook")
-async def receive_webhook(
-    request: Request,
-    background_tasks: BackgroundTasks,
-):
+async def receive_webhook(request: Request):
     body = await request.body()
     sig = request.headers.get("X-Hub-Signature-256")
     if not _verify_signature(body, sig):
@@ -185,13 +216,15 @@ async def receive_webhook(
             text = img.get("caption") or ""
 
         if phone and (text or pdf_bytes or image_bytes):
-            background_tasks.add_task(
-                _process_message,
-                phone,
-                message_id,
-                text=text,
-                image_bytes=image_bytes,
-                pdf_bytes=pdf_bytes,
+            logger.info("WhatsApp inbound from %s type=%s", phone[-4:], msg_type)
+            asyncio.create_task(
+                _process_message(
+                    phone,
+                    message_id,
+                    text=text,
+                    image_bytes=image_bytes,
+                    pdf_bytes=pdf_bytes,
+                )
             )
 
     return {"status": "ok"}

@@ -51,6 +51,14 @@ class Settings(BaseSettings):
             self.supabase_url = self.vite_supabase_url
         return self
 
+    @model_validator(mode="after")
+    def _strip_meta_secrets(self) -> "Settings":
+        self.meta_whatsapp_token = self.meta_whatsapp_token.strip()
+        self.meta_phone_number_id = self.meta_phone_number_id.strip()
+        self.meta_verify_token = self.meta_verify_token.strip()
+        self.meta_app_secret = self.meta_app_secret.strip()
+        return self
+
     @property
     def resolved_supabase_url(self) -> str:
         return self.supabase_url or self.vite_supabase_url
