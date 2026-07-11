@@ -194,6 +194,7 @@ create table public.whatsapp_sessions (
   buffer jsonb default '[]'::jsonb,
   buffer_started_at timestamptz,
   last_message_at timestamptz,
+  chat_history jsonb default '[]'::jsonb,
   updated_at timestamptz default now()
 );
 

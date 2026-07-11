@@ -44,6 +44,8 @@ Root [`Dockerfile`](../Dockerfile) (HF Space) copies only `Backend/agent-service
 
 ## WhatsApp webhook setup
 
+WhatsApp uses the **same orchestrator** as web `/chat` (`handle_chat_message` + agent tools). Conversation history is stored per phone in `whatsapp_sessions.chat_history`.
+
 Outbound messages (templates) work once `META_WHATSAPP_TOKEN` and `META_PHONE_NUMBER_ID` are set. **Inbound replies** also need a subscribed webhook:
 
 1. In [Meta Developer Console](https://developers.facebook.com/) → your app → **WhatsApp → Configuration**:

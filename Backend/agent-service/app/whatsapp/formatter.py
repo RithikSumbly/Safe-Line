@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.core.schemas import AgentVerdict, VerdictStatus
+from app.core.schemas import AgentVerdict, ChatMessageResponse, VerdictStatus
 
 STATUS_EMOJI = {
     "high_risk": "🟥",
@@ -51,3 +51,17 @@ def format_verdict_message(verdict: AgentVerdict, *, onboarding: bool = False) -
     if len(text) > 1500:
         return text[:1490] + "…"
     return text
+
+
+def format_chat_response_for_whatsapp(response: ChatMessageResponse) -> str:
+    """Combine orchestrator intro text with a condensed verdict block for WhatsApp."""
+    parts: list[str] = []
+    intro = (response.assistant_text or "").strip()
+    if intro:
+        parts.append(intro)
+    if response.verdict:
+        parts.append(format_verdict_message(response.verdict))
+    body = "\n\n".join(parts).strip()
+    if len(body) > 4000:
+        return body[:3990] + "…"
+    return body
