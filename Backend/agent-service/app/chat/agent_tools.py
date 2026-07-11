@@ -10,6 +10,7 @@ from app.agents.crisis_rumor import run_crisis_agent
 from app.agents.job_offer import run_job_agent
 from app.agents.scam import run_scam_agent
 from app.core.llm_client import get_llm_client
+from app.core.prompt_guards import analysis_prompt
 from app.core.schemas import AnnotatedVerdict, ChatToolName, CheckInput
 
 EMAIL_RE = re.compile(r"[\w.-]+@([\w.-]+\.\w+)")
@@ -44,7 +45,7 @@ async def answer_safety_question(text: str) -> str:
     """General scam/trust-safety Q&A without a full live evidence check."""
     llm = get_llm_client()
     result = await llm.structured_json(
-        system=(
+        system=analysis_prompt(
             "You are SafeLine's scam and trust-safety educator for India. "
             "Answer in 2-4 short sentences. Be practical and calm. "
             "Cover red flags, what to do, and official channels (e.g. cybercrime.gov.in, 1930) "

@@ -5,13 +5,21 @@ import logging
 
 from pydantic import BaseModel, Field
 
-from app.agents.base import VerdictDraft, finalize_verdict
+from app.agents.base import (
+    VerdictDraft,
+    enforce_uncertainty_bounds,
+    finalize_verdict,
+    insufficient_input_draft,
+)
 from app.agents.scam_heuristics import (
     analyze_message_patterns,
     filter_irrelevant_evidence,
     merge_red_flags,
 )
+from app.core.input_sufficiency import is_insufficient_for_check
 from app.core.llm_client import get_llm_client
+from app.core.prompt_guards import extraction_prompt, synthesis_prompt
+from app.core.status_coercion import coerce_verdict_status
 from app.core.schemas import AnnotatedVerdict, CheckInput, EvidenceItem
 from app.rag.retriever import retrieve_chunks
 from app.tools.safe_browsing import check_safe_browsing
@@ -99,6 +107,9 @@ def _heuristic_draft(
 
 async def run_scam_agent(inp: CheckInput) -> AnnotatedVerdict:
     text = inp.text.strip()
+    if is_insufficient_for_check(text):
+        return await finalize_verdict("scam", text, insufficient_input_draft("scam", text))
+
     urls = extract_urls(text, inp.url)
     profile = analyze_message_patterns(text, urls)
 
@@ -125,7 +136,9 @@ async def run_scam_agent(inp: CheckInput) -> AnnotatedVerdict:
     try:
         llm = get_llm_client()
         signals = await llm.structured_json(
-            system="Extract scam signals from the message as structured JSON.",
+            system=extraction_prompt(
+                "Extract scam signals from the message as structured JSON."
+            ),
             user=text,
             schema=ScamSignals,
         )
@@ -142,10 +155,10 @@ async def run_scam_agent(inp: CheckInput) -> AnnotatedVerdict:
     try:
         llm = get_llm_client()
         synth = await llm.structured_json(
-            system=(
+            system=synthesis_prompt(
                 "You are SafeLine's scam analyst for India. Write a verdict grounded ONLY "
                 "in the message text and evidence list — never cite RBI/KYC unless the message "
-                "mentions banks, OTP, or KYC.\n\n"
+                "mentions banks, OTP, or KYC.",
                 "red_flags: 2-4 short bullets quoting WHAT IN THE MESSAGE is suspicious "
                 "(e.g. 'Says you won 338492 rupees', 'Asks subscribe on youtube.com for payout'). "
                 "Not generic analyst labels.\n\n"
@@ -154,7 +167,7 @@ async def run_scam_agent(inp: CheckInput) -> AnnotatedVerdict:
                 "family_friendly_rewrite: 3-4 sentences explaining the scam to parents/relatives "
                 "in plain language — what trick is being used and why it's fake. NOT a copy-paste "
                 "alert to forward. Educational tone.\n\n"
-                "status: high_risk | medium_risk | low_risk | likely_safe | unverified"
+                "status: high_risk | medium_risk | low_risk | likely_safe | unverified",
             ),
             user=(
                 f"Message:\n{text}\n\n"
@@ -170,7 +183,7 @@ async def run_scam_agent(inp: CheckInput) -> AnnotatedVerdict:
             schema=ScamSynthesis,
         )
         draft = VerdictDraft(
-            status=synth.status,  # type: ignore[arg-type]
+            status=coerce_verdict_status(synth.status, "scam"),
             confidence=synth.confidence,
             red_flags=merge_red_flags(synth.red_flags, profile.red_flags),
             evidence=evidence,
@@ -186,6 +199,8 @@ async def run_scam_agent(inp: CheckInput) -> AnnotatedVerdict:
     except Exception as exc:
         logger.warning("Scam LLM synthesis failed, using heuristic draft: %s", exc)
         draft = _heuristic_draft(text, evidence, profile)
+
+    draft = enforce_uncertainty_bounds(draft, "scam", text)
 
     if not draft.red_flags:
         draft.red_flags = profile.red_flags

@@ -16,6 +16,19 @@ _LOAN_FEE = re.compile(
     r"refundable\s+fee|pay\s+.*\s+via\s+upi)\b"
 )
 _URGENCY = re.compile(r"(?i)\b(urgent|immediately|act\s*now|within\s*\d+\s*(hours?|mins?))\b")
+_PARCEL = re.compile(
+    r"(?i)\b(parcel|customs|courier|delivery|indiapost|india\s*post|tracking|duty|held\s+at)\b"
+)
+
+_TOPIC_GROUPS: list[tuple[re.Pattern[str], str]] = [
+    (_PARCEL, "parcel"),
+    (_BANK, "bank"),
+    (_LOAN_FEE, "loan"),
+    (re.compile(r"(?i)\b(gst|income\s*tax|itr|refund|notice\s+fee)\b"), "tax"),
+    (re.compile(r"(?i)\b(vehicle|rc\b|repossess|car\s+loan)\b"), "vehicle"),
+    (_PRIZE, "prize"),
+    (_CREATOR, "creator"),
+]
 
 
 @dataclass
@@ -42,6 +55,7 @@ def analyze_message_patterns(text: str, urls: list[str] | None = None) -> ScamPa
     has_subscribe = bool(_SUBSCRIBE.search(text))
     has_bank = bool(_BANK.search(text))
     has_urgency = bool(_URGENCY.search(text))
+    has_parcel = bool(_PARCEL.search(text))
     has_loan_fee = bool(_LOAN_FEE.search(text))
     has_youtube = "youtube.com" in lower or "youtu.be" in lower
 
@@ -102,6 +116,27 @@ def analyze_message_patterns(text: str, urls: list[str] | None = None) -> ScamPa
                 "Uses a YouTube link as part of a prize claim — not how verified giveaways work"
             )
 
+    if has_parcel:
+        profile.tags.append("delivery_scam")
+        profile.red_flags.append(
+            "Pretends to be a courier or customs notice demanding payment via a link"
+        )
+        if has_urgency:
+            profile.red_flags.append(
+                "Threatens parcel destruction or return if you do not pay within a short deadline"
+            )
+        profile.evidence.append(
+            EvidenceItem(
+                source_name="India Post — official parcel tracking",
+                source_url="https://www.indiapost.gov.in/",
+                supports_claim=False,
+                snippet=(
+                    "India Post publishes tracking and customs updates on indiapost.gov.in. "
+                    "Scams use lookalike domains and SMS links to collect fake duty fees."
+                ),
+            )
+        )
+
     if has_loan_fee:
         profile.tags.append("loan_fee_scam")
         profile.red_flags.append(
@@ -149,7 +184,7 @@ def analyze_message_patterns(text: str, urls: list[str] | None = None) -> ScamPa
         for t in profile.tags
         if t in ("bank_impersonation", "celebrity_impersonation", "youtube_impersonation", "loan_fee_scam")
     )
-    if has_bank or has_loan_fee:
+    if has_bank or has_loan_fee or has_parcel:
         profile.status = "high_risk"
         profile.confidence = 0.82
     elif has_prize and (has_creator or has_youtube or has_subscribe):
@@ -185,6 +220,11 @@ def _build_explanation(tags: list[str], has_creator: bool, has_youtube: bool) ->
         return (
             "The message uses banking or loan language commonly seen in advance-fee fraud."
         )
+    if "delivery_scam" in tags:
+        return (
+            "This follows a fake parcel or customs fee pattern: a duty payment is demanded "
+            "through a link that is not the official courier site."
+        )
     return "Several parts of this message match known scam patterns."
 
 
@@ -203,6 +243,11 @@ def _build_action(tags: list[str], urls: list[str], has_bank: bool) -> str:
         return (
             "Do not pay any processing fee. Real lenders never ask for upfront UPI payments "
             "to release a pre-approved loan. Delete the message and block the sender."
+        )
+    if "delivery_scam" in tags:
+        return (
+            "Do not pay or open the link. Check parcel status only on the official courier "
+            "website (e.g. indiapost.gov.in). Delete the message and block the sender."
         )
     if has_bank:
         return (
@@ -237,6 +282,12 @@ def _build_family_message(
             "fee before any money is sent. Real banks and NBFCs never take processing fees "
             "via SMS or UPI links. Please delete it and don't pay anything."
         )
+    if "delivery_scam" in tags:
+        return (
+            "This is a fake parcel/customs message. Scammers pretend your package is held until "
+            "you pay a duty fee through their link. Real couriers post updates on official sites "
+            "like indiapost.gov.in — please delete this and don't pay."
+        )
     if "bank_impersonation" in tags:
         return (
             "This looks like a fake bank or KYC message. Banks don't ask for OTPs or payments "
@@ -249,21 +300,45 @@ def _build_family_message(
     )
 
 
+def _message_topics(text: str) -> set[str]:
+    topics: set[str] = set()
+    for pattern, label in _TOPIC_GROUPS:
+        if pattern.search(text):
+            topics.add(label)
+    return topics
+
+
+def _evidence_topics(snippet: str, source_name: str) -> set[str]:
+    combined = f"{source_name} {snippet}"
+    topics: set[str] = set()
+    for pattern, label in _TOPIC_GROUPS:
+        if pattern.search(combined):
+            topics.add(label)
+    return topics
+
+
 def filter_irrelevant_evidence(
     evidence: list[EvidenceItem],
     text: str,
 ) -> list[EvidenceItem]:
-    """Drop RBI/KYC snippets when the message is not bank-related."""
-    if _BANK.search(text):
-        return evidence
-    return [
-        e
-        for e in evidence
-        if not (
-            e.source_name.upper() == "RBI"
-            and "kyc" in e.snippet.lower()
-        )
-    ]
+    """Drop corpus/RAG snippets whose topic does not match the message."""
+    msg_topics = _message_topics(text)
+    kept: list[EvidenceItem] = []
+    for item in evidence:
+        if _BANK.search(text):
+            kept.append(item)
+            continue
+        if (
+            item.source_name.upper() == "RBI"
+            and "kyc" in item.snippet.lower()
+            and "bank" not in msg_topics
+        ):
+            continue
+        ev_topics = _evidence_topics(item.snippet, item.source_name)
+        if msg_topics and ev_topics and not (msg_topics & ev_topics):
+            continue
+        kept.append(item)
+    return kept
 
 
 def merge_red_flags(primary: list[str], secondary: list[str], cap: int = 5) -> list[str]:

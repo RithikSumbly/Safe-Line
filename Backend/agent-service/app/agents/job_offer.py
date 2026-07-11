@@ -5,8 +5,16 @@ import re
 
 from pydantic import BaseModel, Field
 
-from app.agents.base import VerdictDraft, finalize_verdict
+from app.agents.base import (
+    VerdictDraft,
+    enforce_uncertainty_bounds,
+    finalize_verdict,
+    insufficient_input_draft,
+)
+from app.core.input_sufficiency import is_insufficient_for_check
 from app.core.llm_client import get_llm_client
+from app.core.prompt_guards import extraction_prompt, synthesis_prompt
+from app.core.status_coercion import coerce_verdict_status
 from app.core.schemas import AnnotatedVerdict, CheckInput, EvidenceItem
 from app.rag.retriever import retrieve_chunks
 from app.tools.dns_mx import check_mx
@@ -129,13 +137,20 @@ async def _live_job_evidence(
 
 async def run_job_agent(inp: CheckInput) -> AnnotatedVerdict:
     text = inp.text.strip()
+    if is_insufficient_for_check(text):
+        return await finalize_verdict(
+            "job_offer", text, insufficient_input_draft("job_offer", text)
+        )
+
     domain = _email_domain(inp.email, text)
 
     signals = JobSignals()
     try:
         llm = get_llm_client()
         signals = await llm.structured_json(
-            system="Extract job offer scam signals.",
+            system=extraction_prompt(
+                "Extract job offer scam signals from the message as structured JSON."
+            ),
             user=text,
             schema=JobSignals,
         )
@@ -162,16 +177,18 @@ async def run_job_agent(inp: CheckInput) -> AnnotatedVerdict:
     try:
         llm = get_llm_client()
         synth = await llm.structured_json(
-            system=(
-                "Synthesize fake job offer verdict from LIVE evidence only. "
-                "Do not cite sources not present in the evidence list."
+            system=synthesis_prompt(
+                "You are SafeLine's job-offer analyst for India.",
+                "Synthesize a fake-job-offer verdict from the message and LIVE evidence only. "
+                "Do not cite sources not present in the evidence list.\n\n"
+                "status: high_risk | medium_risk | low_risk | likely_safe | unverified",
             ),
             user=f"Offer:\n{text}\n\nSignals: {signals}\n\nEvidence:\n"
             + "\n".join(f"- {e.source_name}: {e.snippet}" for e in evidence),
             schema=JobSynthesis,
         )
         draft = VerdictDraft(
-            status=synth.status,  # type: ignore[arg-type]
+            status=coerce_verdict_status(synth.status, "job_offer"),
             confidence=synth.confidence,
             red_flags=synth.red_flags,
             evidence=evidence,
@@ -197,5 +214,7 @@ async def run_job_agent(inp: CheckInput) -> AnnotatedVerdict:
             ),
             needs_human_review=not evidence,
         )
+
+    draft = enforce_uncertainty_bounds(draft, "job_offer", text)
 
     return await finalize_verdict("job_offer", text, draft)

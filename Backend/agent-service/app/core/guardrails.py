@@ -24,8 +24,7 @@ DISCLAIMERS: dict[AgentType, str] = {
         "through the employer's official careers portal."
     ),
     "crisis_rumor": (
-        "Verify with official disaster management and government sources "
-        "before acting on forwarded claims."
+        "Verify with the relevant official organisation before acting on forwarded claims."
     ),
 }
 
@@ -37,6 +36,10 @@ def strip_pii(text: str) -> str:
     return out
 
 
+_DISASTER_URGENT = re.compile(
+    r"(?i)\b(flood|dam\s*break|evacuat|earthquake|cyclone|landslide|"
+    r"building\s*collapse|gas\s*leak|fire\s*outbreak|tsunami|immediate\s+danger)\b"
+)
 _BANKISH = re.compile(r"(?i)\b(bank|kyc|otp|upi|account|card|passbook)\b")
 
 
@@ -74,7 +77,11 @@ def apply_guardrails(verdict: AgentVerdict) -> AgentVerdict:
             )
 
     if verdict.agent == "crisis_rumor" and verdict.status == "unverified":
-        if "1930" not in verdict.recommended_action and "112" not in verdict.recommended_action:
+        combined = f"{verdict.recommended_action} {' '.join(verdict.red_flags)}"
+        if (
+            _DISASTER_URGENT.search(combined)
+            and "112" not in verdict.recommended_action.lower()
+        ):
             verdict.recommended_action = (
                 "If you are in immediate danger, call 112 or your local emergency number. "
                 + verdict.recommended_action

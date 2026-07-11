@@ -48,16 +48,19 @@ async def find_user_by_whatsapp(phone: str) -> Optional[str]:
         return None
     normalized = normalize_phone(phone)
     variants = {normalized, "+" + normalized, phone}
-    for variant in variants:
-        res = (
-            client.table("profiles")
-            .select("id")
-            .eq("whatsapp_phone", variant)
-            .maybe_single()
-            .execute()
-        )
-        if res.data:
-            return res.data["id"]
+    try:
+        for variant in variants:
+            res = (
+                client.table("profiles")
+                .select("id")
+                .eq("whatsapp_phone", variant)
+                .maybe_single()
+                .execute()
+            )
+            if res.data:
+                return res.data["id"]
+    except Exception as exc:
+        logger.warning("WhatsApp profile lookup failed: %s", exc)
     return None
 
 

@@ -16,8 +16,30 @@ T = TypeVar("T", bound=BaseModel)
 _GEMINI_SCHEMA_SKIP = frozenset({"default", "default_factory", "title", "$schema"})
 
 
+def _inline_json_schema_defs(schema: dict[str, Any]) -> dict[str, Any]:
+    """Gemini response_schema rejects top-level $defs — inline referenced models."""
+    import copy
+
+    schema = copy.deepcopy(schema)
+    defs = schema.pop("$defs", None) or schema.pop("definitions", None) or {}
+
+    def resolve(node: Any) -> Any:
+        if isinstance(node, dict):
+            if "$ref" in node:
+                name = node["$ref"].rsplit("/", 1)[-1]
+                if name in defs:
+                    return resolve(copy.deepcopy(defs[name]))
+                return node
+            return {key: resolve(value) for key, value in node.items()}
+        if isinstance(node, list):
+            return [resolve(item) for item in node]
+        return node
+
+    return resolve(schema)
+
+
 def _gemini_response_schema(model: type[BaseModel]) -> dict[str, Any]:
-    """Gemini response_schema rejects JSON Schema 'default' keys from Pydantic."""
+    """Gemini response_schema rejects JSON Schema 'default' and '$defs' keys."""
     raw = model.model_json_schema()
 
     def clean(node: Any) -> Any:
@@ -32,7 +54,7 @@ def _gemini_response_schema(model: type[BaseModel]) -> dict[str, Any]:
             return [clean(item) for item in node]
         return node
 
-    return clean(raw)
+    return _inline_json_schema_defs(clean(raw))
 
 
 class LLMClient(ABC):

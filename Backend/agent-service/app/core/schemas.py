@@ -73,6 +73,20 @@ class SpanAnnotationResult(BaseModel):
     flagged_spans: list[FlaggedSpan]
 
 
+class SpanPhraseResult(BaseModel):
+    """Flat schema for Gemini — phrases are located in Python, not LLM offsets."""
+
+    phrases: list[str] = Field(
+        description="Exact verbatim suspicious substrings copied from the input message"
+    )
+    tags: list[int] = Field(
+        description="1-based red-flag index for each phrase, same order as phrases"
+    )
+    severities: list[SpanSeverity] = Field(
+        description="risk|verified|pending for each phrase, same order as phrases"
+    )
+
+
 ChatRole = Literal["user", "assistant", "system"]
 ChatMessageType = Literal["text", "verdict", "clarification", "help", "error"]
 ChatToolName = Literal[

@@ -23,6 +23,11 @@ def apply_evidence_floor(verdict: AgentVerdict) -> AgentVerdict:
     RAG is optional enrichment; heuristics, LLM reasoning, and live API/link
     checks all count — an empty vector index must not block a verdict.
     """
+    if not verdict.evidence and "isn't enough detail" in verdict.explanation.lower():
+        verdict.confidence = min(verdict.confidence, 0.55)
+        verdict.evidence = normalize_evidence(verdict.evidence)
+        return verdict
+
     if not verdict.evidence:
         has_analysis = bool(verdict.red_flags) and bool(verdict.explanation.strip())
         if has_analysis and verdict.agent in ("scam", "job_offer"):

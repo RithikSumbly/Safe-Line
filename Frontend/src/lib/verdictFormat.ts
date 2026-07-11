@@ -1,5 +1,4 @@
 import type {
-  AgentType,
   AnnotatedVerdict,
   FlaggedSpan,
   VerdictStatus,
@@ -47,73 +46,17 @@ export function actionSteps(action: string): string[] {
     .filter((s) => s.length > 0);
 }
 
-const FALLBACK_ACTIONS: Record<
-  AgentType,
-  Partial<Record<VerdictStatus, string[]>>
-> = {
-  scam: {
-    high_risk: [
-      "Don't click any links in the message.",
-      "Don't share OTP, PIN, or bank details.",
-      "Block the sender and delete the message.",
-    ],
-    medium_risk: [
-      "Treat the message as suspicious and avoid replying.",
-      "Don't click links or send money.",
-      "Verify through official channels if unsure.",
-    ],
-    low_risk: [
-      "Stay cautious and avoid sharing personal details.",
-      "Delete the message if you didn't expect it.",
-    ],
-    likely_false: [
-      "Don't act on the claim without independent verification.",
-      "Check official sources before sharing or forwarding.",
-    ],
-    unverified: [
-      "Don't click links until you've verified the sender.",
-      "Contact the organization through official channels.",
-    ],
-  },
-  job_offer: {
-    high_risk: [
-      "Don't pay any registration or onboarding fee.",
-      "Verify the employer on their official careers site.",
-      "Don't share identity documents over chat.",
-    ],
-    medium_risk: [
-      "Confirm the offer through the company's official website.",
-      "Be wary of personal email domains or Telegram-only contact.",
-    ],
-    unverified: [
-      "Ask for a written offer on company letterhead.",
-      "Verify the recruiter through official HR channels.",
-    ],
-  },
-  crisis_rumor: {
-    high_risk: [
-      "Don't forward the message without checking official sources.",
-      "Follow guidance from local disaster management authorities.",
-    ],
-    likely_false: [
-      "Don't share the rumor — it may be outdated or fabricated.",
-      "Check government and news sources before acting.",
-    ],
-    unverified: [
-      "Treat the claim as unconfirmed until verified.",
-      "Check official disaster or government channels.",
-    ],
-  },
-};
-
 export function getActionSteps(verdict: AnnotatedVerdict): string[] {
   const parsed = actionSteps(verdict.recommended_action);
   if (parsed.length > 0) return parsed.slice(0, 4);
 
-  const fallback =
-    FALLBACK_ACTIONS[verdict.agent]?.[verdict.status] ??
-    FALLBACK_ACTIONS.scam.medium_risk;
-  return fallback ?? ["Delete the message and avoid interacting with the sender."];
+  // Last resort only — prefer backend/LLM recommended_action always.
+  if (verdict.explanation.trim()) {
+    return [
+      `Based on our check: ${verdict.explanation.trim().replace(/\s+/g, " ")}`,
+    ];
+  }
+  return ["Verify through official sources before forwarding or acting on this message."];
 }
 
 export function getFamilyExplanation(verdict: AnnotatedVerdict): string {
@@ -121,6 +64,17 @@ export function getFamilyExplanation(verdict: AnnotatedVerdict): string {
   if (rewrite) return rewrite;
 
   const topFlag = verdict.red_flags[0];
+  if (verdict.agent === "crisis_rumor") {
+    if (verdict.explanation && topFlag) {
+      return `${verdict.explanation} ${topFlag} Please wait for official confirmation before sharing.`;
+    }
+    if (verdict.explanation) return verdict.explanation;
+    return (
+      "This forwarded message makes a claim we couldn't verify. " +
+      "Official updates come from government or board websites — safest not to share until confirmed."
+    );
+  }
+
   if (verdict.explanation && topFlag) {
     return `${verdict.explanation} ${topFlag} It's safest to ignore or delete the message without clicking links.`;
   }

@@ -1,17 +1,30 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from pydantic import BaseModel, Field
 
-from app.agents.base import VerdictDraft, finalize_verdict
+from app.agents.base import (
+    VerdictDraft,
+    enforce_uncertainty_bounds,
+    finalize_verdict,
+    insufficient_input_draft,
+)
+from app.agents.crisis_heuristics import analyze_crisis_patterns, merge_crisis_red_flags
+from app.core.input_sufficiency import is_insufficient_for_check
 from app.core.llm_client import get_llm_client
+from app.core.prompt_guards import extraction_prompt, synthesis_prompt
+from app.core.status_coercion import coerce_verdict_status
 from app.core.schemas import AnnotatedVerdict, CheckInput, EvidenceItem
 from app.tools.fact_check import check_fact_check
 from app.tools.gdelt import search_gdelt
 from app.tools.gov_search import search_government
 from app.tools.news_api import search_news
 from app.tools.nominatim import geocode, location_mismatch_evidence
+
+
+logger = logging.getLogger(__name__)
 
 
 class CrisisClaim(BaseModel):
@@ -29,23 +42,46 @@ class CrisisSynthesis(BaseModel):
     explanation: str
     recommended_action: str
     needs_human_review: bool = False
-    safe_rewrite: str = ""
+    family_friendly_rewrite: str = ""
+
+
+def _status_from_evidence(evidence: list[EvidenceItem]) -> str:
+    false_hits = sum(1 for e in evidence if not e.supports_claim)
+    confirm_hits = sum(1 for e in evidence if e.supports_claim)
+    if false_hits >= 2:
+        return "likely_false"
+    if confirm_hits >= 2 and false_hits == 0:
+        return "confirmed"
+    if any(
+        "mislocalized" in e.snippet.lower() or "different area" in e.snippet.lower()
+        for e in evidence
+    ):
+        return "outdated"
+    return "unverified"
 
 
 async def run_crisis_agent(inp: CheckInput) -> AnnotatedVerdict:
     text = inp.text.strip()
+    if is_insufficient_for_check(text):
+        return await finalize_verdict(
+            "crisis_rumor", text, insufficient_input_draft("crisis_rumor", text)
+        )
+
+    profile = analyze_crisis_patterns(text)
     evidence: list[EvidenceItem] = []
 
     claim = CrisisClaim()
     try:
         llm = get_llm_client()
         claim = await llm.structured_json(
-            system="Extract structured crisis rumor claim fields.",
+            system=extraction_prompt(
+                "Extract structured crisis rumor claim fields from the message."
+            ),
             user=text,
             schema=CrisisClaim,
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Crisis claim extraction failed: %s", exc)
 
     user_geo = await geocode(inp.location or "")
     if user_geo:
@@ -65,71 +101,97 @@ async def run_crisis_agent(inp: CheckInput) -> AnnotatedVerdict:
         if isinstance(batch, list):
             evidence.extend(batch)
 
-    if not evidence:
-        draft = VerdictDraft(
-            status="unverified",
-            confidence=0.25,
-            red_flags=["No matching fact-checks or official bulletins found"],
-            evidence=[],
-            explanation=(
-                "We could not find corroborating fact-checks or official advisories for this claim. "
-                "Live sources may be unavailable or the claim is too recent to verify."
-            ),
-            recommended_action=(
-                "If you are in immediate danger, call 112. Otherwise verify with local disaster "
-                "management authorities before forwarding. Do not panic-share unverified forwards."
-            ),
-            needs_human_review=True,
-        )
-        return await finalize_verdict("crisis_rumor", text, draft)
+    status = _status_from_evidence(evidence) if evidence else profile.status
 
-    false_hits = sum(1 for e in evidence if not e.supports_claim)
-    confirm_hits = sum(1 for e in evidence if e.supports_claim)
-    if false_hits >= 2:
-        status = "likely_false"
-    elif confirm_hits >= 2 and false_hits == 0:
-        status = "confirmed"
-    elif mismatch_evidence := any("mislocalized" in e.snippet.lower() or "different area" in e.snippet.lower() for e in evidence):
-        status = "outdated" if mismatch_evidence else "unverified"
-    else:
-        status = "unverified"
-
+    draft: VerdictDraft | None = None
     try:
         llm = get_llm_client()
         synth = await llm.structured_json(
-            system=(
-                "Synthesize crisis rumor verdict. status: confirmed, likely_false, outdated, unverified. "
-                "Include a calm safe_rewrite message for group chats in recommended_action."
+            system=synthesis_prompt(
+                "You are SafeLine's crisis rumor analyst for India.",
+                "Write a verdict grounded in the claim text and evidence (evidence may be empty).\n\n"
+                "red_flags: 2-4 bullets about what is suspicious IN THIS specific forward "
+                "(e.g. 'Says CBSE paper leaked but cites no official notice', "
+                "'Asks to forward before deletion'). Not generic disaster boilerplate.\n\n"
+                "recommended_action: 2-4 imperative steps specific to THIS rumor type "
+                "(exam leak → check cbse.gov.in; flood → district/NDMA; health → MoHFW). "
+                "Only mention 112 if the claim involves immediate physical danger "
+                "(flood, fire, collapse, evacuation). Never mention 112 for exam or job rumors.\n\n"
+                "family_friendly_rewrite: 2-3 plain sentences for relatives explaining "
+                "what the forward claims and why it's unverified — educational, not an alert template.\n\n"
+                "status: confirmed | likely_false | outdated | unverified",
             ),
             user=(
-                f"Claim:\n{text}\n\nExtracted: {claim}\n\nEvidence:\n"
-                + "\n".join(f"- {e.source_name}: {e.snippet}" for e in evidence)
+                f"Claim:\n{text}\n\n"
+                f"Detected patterns: {profile.tags}\n"
+                f"Extracted fields: {claim.model_dump()}\n\n"
+                f"Evidence:\n"
+                + "\n".join(
+                    f"- [{e.source_name}] supports={e.supports_claim}: {e.snippet}"
+                    for e in evidence
+                )
+                or "(no external evidence — reason from claim content only)"
             ),
             schema=CrisisSynthesis,
         )
-        action = synth.recommended_action
-        if synth.safe_rewrite:
-            action += f"\n\nSuggested reply to forward: {synth.safe_rewrite}"
         draft = VerdictDraft(
-            status=synth.status,  # type: ignore[arg-type]
-            confidence=synth.confidence,
-            red_flags=synth.red_flags,
+            status=coerce_verdict_status(synth.status, "crisis_rumor"),
+            confidence=synth.confidence if evidence else min(synth.confidence, 0.4),
+            red_flags=merge_crisis_red_flags(synth.red_flags, profile.red_flags),
             evidence=evidence,
-            explanation=synth.explanation,
-            recommended_action=action,
-            needs_human_review=synth.needs_human_review or status == "unverified",
-        )
-    except Exception:
-        draft = VerdictDraft(
-            status=status,  # type: ignore[arg-type]
-            confidence=0.55,
-            red_flags=["Conflicting or thin corroboration across sources"],
-            evidence=evidence,
-            explanation="Cross-source review produced mixed or limited corroboration for this claim.",
-            recommended_action=(
-                "Verify with official sources (PIB, NDMA, state disaster management) before acting or forwarding."
+            explanation=synth.explanation or profile.explanation,
+            recommended_action=synth.recommended_action or profile.recommended_action,
+            needs_human_review=synth.needs_human_review or not evidence,
+            family_friendly_rewrite=(
+                synth.family_friendly_rewrite or profile.family_friendly_rewrite
             ),
-            needs_human_review=status == "unverified",
         )
+    except Exception as exc:
+        logger.warning("Crisis LLM synthesis failed, using heuristic draft: %s", exc)
+        draft = None
+
+    if draft is None:
+        if not evidence:
+            draft = VerdictDraft(
+                status=profile.status,  # type: ignore[arg-type]
+                confidence=profile.confidence,
+                red_flags=profile.red_flags
+                or ["No matching fact-checks or official bulletins found"],
+                evidence=[],
+                explanation=profile.explanation,
+                recommended_action=profile.recommended_action,
+                needs_human_review=True,
+                family_friendly_rewrite=profile.family_friendly_rewrite,
+            )
+        else:
+            draft = VerdictDraft(
+                status=status,  # type: ignore[arg-type]
+                confidence=0.55,
+                red_flags=merge_crisis_red_flags(
+                    ["Conflicting or thin corroboration across sources"],
+                    profile.red_flags,
+                ),
+                evidence=evidence,
+                explanation=(
+                    profile.explanation
+                    or "Cross-source review produced mixed or limited corroboration for this claim."
+                ),
+                recommended_action=profile.recommended_action
+                or (
+                    "Verify with the relevant official organisation before forwarding "
+                    "or acting on this claim."
+                ),
+                needs_human_review=status == "unverified",
+                family_friendly_rewrite=profile.family_friendly_rewrite,
+            )
+
+    draft = enforce_uncertainty_bounds(draft, "crisis_rumor", text)
+
+    if not draft.red_flags:
+        draft.red_flags = profile.red_flags or [
+            "No matching fact-checks or official bulletins found"
+        ]
+    if not draft.family_friendly_rewrite:
+        draft.family_friendly_rewrite = profile.family_friendly_rewrite
 
     return await finalize_verdict("crisis_rumor", text, draft)

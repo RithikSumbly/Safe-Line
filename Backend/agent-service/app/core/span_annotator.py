@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import logging
 import re
 
 from app.core.llm_client import get_llm_client
-from app.core.schemas import FlaggedSpan, SpanAnnotationResult, SpanSeverity, VerdictStatus
+from app.core.prompt_guards import analysis_prompt
+from app.core.schemas import FlaggedSpan, SpanPhraseResult, SpanSeverity, VerdictStatus
+
+logger = logging.getLogger(__name__)
+
+_SUSPICIOUS = re.compile(
+    r"(?i)(https?://|\.com/|\.in/|rs\.?\s*\d|₹\s*\d|\b\d+\s*hours?\b|"
+    r"destroy|leaked|forward\s+to\s+all|won|prize|subscribe|kyc|otp|pay\b)"
+)
 
 
 def _severity_for_status(status: VerdictStatus) -> SpanSeverity:
@@ -14,57 +23,83 @@ def _severity_for_status(status: VerdictStatus) -> SpanSeverity:
     return "pending"
 
 
-# Map red-flag index (1-based tag) to regexes that must match text literally
-_MESSAGE_INDICATORS: list[tuple[re.Pattern[str], int | None]] = [
-    (re.compile(r"(?i)\b(won|winner|congratulations|congrats|prize|lottery)\b"), 1),
-    (re.compile(r"(?i)\b\d[\d,]*\s*(rupees?|rs\.?)\b"), 1),
-    (re.compile(r"(?i)youtube\.com[^\s]*"), 2),
-    (re.compile(r"(?i)\byoutu\.be[^\s]*"), 2),
-    (re.compile(r"(?i)\bsubscribe\b"), 2),
-    (re.compile(r"(?i)\b(mr\.?\s*beast|mrleast)\b"), 2),
-    (re.compile(r"(?i)\b(kyc|otp|upi|account\s*frozen)\b"), 3),
-    (re.compile(r"https?://[^\s]+", re.I), None),
-]
+def _locate_phrase(input_text: str, phrase: str) -> tuple[int, int] | None:
+    phrase = phrase.strip()
+    if len(phrase) < 4:
+        return None
+    exact = input_text.find(phrase)
+    if exact >= 0:
+        return exact, exact + len(phrase)
+    lower_text = input_text.lower()
+    lower_phrase = phrase.lower()
+    idx = lower_text.find(lower_phrase)
+    if idx >= 0:
+        return idx, idx + len(phrase)
+    return None
 
 
-def _heuristic_spans(
+def _phrase_quality(input_text: str, phrase: str) -> bool:
+    if len(phrase.strip()) < 6:
+        return False
+    # Reject generic openers the model often over-highlights.
+    generic = {
+        "your parcel",
+        "your account",
+        "dear customer",
+        "dear user",
+        "customs",
+        "student",
+        "students",
+    }
+    if phrase.strip().lower() in generic:
+        return False
+    if _SUSPICIOUS.search(phrase):
+        return True
+    # Allow longer phrases even without keyword hits.
+    return len(phrase.strip()) >= 20
+
+
+def _phrases_to_spans(
     input_text: str,
-    red_flags: list[str],
-    status: VerdictStatus,
+    phrases: list[str],
+    tags: list[int],
+    severities: list[SpanSeverity],
+    default_severity: SpanSeverity,
 ) -> list[FlaggedSpan]:
-    """Highlight phrases that literally appear in the message."""
-    severity = _severity_for_status(status)
     spans: list[FlaggedSpan] = []
     used_ranges: list[tuple[int, int]] = []
 
-    def add_span(start: int, end: int, tag: int) -> None:
+    for i, phrase in enumerate(phrases):
+        if i >= len(tags):
+            break
+        if not _phrase_quality(input_text, phrase):
+            continue
+        located = _locate_phrase(input_text, phrase)
+        if not located:
+            continue
+        start, end = located
         if any(not (end <= s or start >= e) for s, e in used_ranges):
-            return
+            continue
+        severity = severities[i] if i < len(severities) else default_severity
         spans.append(
-            FlaggedSpan(start=start, end=end, tag=tag, severity=severity)
+            FlaggedSpan(start=start, end=end, tag=tags[i], severity=severity)
         )
         used_ranges.append((start, end))
 
-    tag_for_generic = 1
-    for pattern, fixed_tag in _MESSAGE_INDICATORS:
-        tag = fixed_tag or min(tag_for_generic, max(len(red_flags), 1))
-        for m in pattern.finditer(input_text):
-            add_span(m.start(), m.end(), tag)
-        if fixed_tag is None and pattern.search(input_text):
-            tag_for_generic += 1
+    return sorted(spans, key=lambda s: s.start)
 
-    # Fallback: if nothing matched, tie tags to red_flag order using short literals from flags
-    if not spans:
-        for i, flag in enumerate(red_flags[:4], start=1):
-            for token in re.findall(r"[A-Za-z0-9.]{4,}", flag):
-                if len(token) < 4:
-                    continue
-                idx = input_text.lower().find(token.lower())
-                if idx >= 0:
-                    add_span(idx, idx + len(token), i)
-                    break
 
-    return spans
+def _dedupe_spans(spans: list[FlaggedSpan]) -> list[FlaggedSpan]:
+    ordered = sorted(spans, key=lambda s: (-(s.end - s.start), s.start))
+    kept: list[FlaggedSpan] = []
+    for span in ordered:
+        if any(
+            not (span.end <= other.start or span.start >= other.end)
+            for other in kept
+        ):
+            continue
+        kept.append(span)
+    return sorted(kept, key=lambda s: s.start)
 
 
 async def annotate_spans(
@@ -72,33 +107,51 @@ async def annotate_spans(
     red_flags: list[str],
     status: VerdictStatus,
 ) -> list[FlaggedSpan]:
+    if not input_text.strip() or not red_flags:
+        return []
+
+    default_severity = _severity_for_status(status)
+    prompt = (
+        f"Input text:\n{input_text}\n\n"
+        f"Status: {status}\n"
+        f"Red flags:\n" + "\n".join(f"{i + 1}. {r}" for i, r in enumerate(red_flags))
+    )
+    system = analysis_prompt(
+        "Return exact suspicious phrases copied verbatim from the input message.\n\n"
+        "For each red flag, pick ONE phrase that best shows the problem:\n"
+        "- fake or lookalike URLs (full domain/path)\n"
+        "- payment amounts and demands\n"
+        "- urgency threats (time limits, deletion, destruction)\n"
+        "- prize/lottery/win claims\n"
+        "- impersonation names\n\n"
+        "Do NOT return innocent framing like 'Your parcel', 'customs', or 'student' alone.\n"
+        "phrases/tags/severities must be the same length (1 entry per flag when possible).\n"
+        "Copy text exactly as it appears — do not paraphrase."
+    )
+
     try:
         llm = get_llm_client()
         result = await llm.structured_json(
-            system=(
-                "Map each red flag to an exact verbatim substring in the input message. "
-                "Rules: (1) start/end must be character offsets into the original input only; "
-                "(2) tag is 1-based and matches the red-flag order; "
-                "(3) severity is risk|verified|pending; "
-                "(4) only highlight phrases that literally appear in the message — "
-                "never highlight analyst commentary or words not in the original text; "
-                "(5) omit a span if no exact phrase matches rather than guessing."
-            ),
-            user=(
-                f"Input text:\n{input_text}\n\n"
-                f"Status: {status}\n"
-                f"Red flags:\n" + "\n".join(f"{i+1}. {r}" for i, r in enumerate(red_flags))
-            ),
-            schema=SpanAnnotationResult,
+            system=system,
+            user=prompt,
+            schema=SpanPhraseResult,
         )
-        valid = [
-            s
-            for s in result.flagged_spans
-            if 0 <= s.start < s.end <= len(input_text)
-            and input_text[s.start : s.end].strip()
-        ]
-        if valid:
-            return valid
-    except Exception:
-        pass
-    return _heuristic_spans(input_text, red_flags, status)
+        spans = _dedupe_spans(
+            _phrases_to_spans(
+                input_text,
+                result.phrases,
+                result.tags,
+                result.severities,
+                default_severity,
+            )
+        )
+        if spans:
+            return spans
+        logger.warning(
+            "Span LLM returned no locatable phrases for %d red flags",
+            len(red_flags),
+        )
+    except Exception as exc:
+        logger.warning("Span LLM annotation failed: %s", exc)
+
+    return []

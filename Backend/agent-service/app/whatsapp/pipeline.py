@@ -34,8 +34,8 @@ class InboundMessage:
     document_bytes: Optional[bytes] = None
 
 
-async def handle_inbound(message: InboundMessage, messenger: Messenger) -> None:
-    """Route WhatsApp messages through the same orchestrator as web /chat."""
+async def handle_inbound(message: InboundMessage, messenger: Messenger) -> bool:
+    """Process one inbound WhatsApp message. Returns True if a user-visible reply was sent."""
     phone = message.phone
 
     if message.document_bytes:
@@ -43,7 +43,7 @@ async def handle_inbound(message: InboundMessage, messenger: Messenger) -> None:
             phone,
             "PDF/doc uploads are not supported. Please paste the text you want checked.",
         )
-        return
+        return True
 
     incoming_text = (message.text or "").strip()
     if message.image_bytes:
@@ -52,7 +52,7 @@ async def handle_inbound(message: InboundMessage, messenger: Messenger) -> None:
 
     if not incoming_text:
         await messenger.send_text(phone, HELP_TEXT)
-        return
+        return True
 
     normalized = incoming_text.strip().upper()
     if normalized in {"RESET", "NEW", "CLEAR"}:
@@ -61,18 +61,17 @@ async def handle_inbound(message: InboundMessage, messenger: Messenger) -> None:
             phone,
             f"Started a new conversation.\n\n{HELP_TEXT}",
         )
-        return
+        return True
 
     # Greetings — instant reply without waiting on the LLM orchestrator.
     if is_chitchat(incoming_text) and not message.image_bytes:
-        help_response = ChatMessageResponse(
+        await messenger.send_text(phone, HELP_TEXT)
+        await _safe_append_chat_turn(phone, incoming_text, ChatMessageResponse(
             type="help",
             session_id=phone,
             assistant_text=HELP_TEXT,
-        )
-        await messenger.send_text(phone, HELP_TEXT)
-        await append_chat_turn(phone, incoming_text, help_response)
-        return
+        ))
+        return True
 
     await messenger.send_typing(phone, message.message_id)
 
@@ -88,35 +87,67 @@ async def handle_inbound(message: InboundMessage, messenger: Messenger) -> None:
             phone,
             "I couldn't process that right now. Please try again in a moment.",
         )
-        return
+        return True
 
     body = format_chat_response_for_whatsapp(response)
     if not body:
         body = HELP_TEXT
     await messenger.send_text(phone, body)
-    await append_chat_turn(phone, incoming_text, response)
 
-    if response.type == "verdict" and response.verdict:
-        user_id = await find_user_by_whatsapp(phone)
-        await log_agent_run(
-            agent=response.verdict.agent,
-            channel="whatsapp",
-            input_text=incoming_text,
-            verdict=response.verdict,
-            user_id=user_id,
-            location={
-                "orchestrator": {
-                    "tool_used": response.tool_used,
-                    "channel": "whatsapp",
-                }
-            },
-            latency_ms=timer.elapsed_ms,
-        )
-        if user_id:
-            await save_check_for_user(
-                user_id,
-                response.verdict.agent,
-                incoming_text,
-                response.verdict,
+    await _safe_post_reply_bookkeeping(
+        phone=phone,
+        incoming_text=incoming_text,
+        response=response,
+        timer=timer,
+    )
+    return True
+
+
+async def _safe_append_chat_turn(
+    phone: str,
+    user_text: str,
+    response: ChatMessageResponse,
+) -> None:
+    try:
+        await append_chat_turn(phone, user_text, response)
+    except Exception as exc:
+        logger.warning("WhatsApp session history update failed: %s", exc)
+
+
+async def _safe_post_reply_bookkeeping(
+    *,
+    phone: str,
+    incoming_text: str,
+    response: ChatMessageResponse,
+    timer: Timer,
+) -> None:
+    """Never fail the user-facing flow after we already sent a reply."""
+    try:
+        await append_chat_turn(phone, incoming_text, response)
+
+        if response.type == "verdict" and response.verdict:
+            user_id = await find_user_by_whatsapp(phone)
+            await log_agent_run(
+                agent=response.verdict.agent,
+                channel="whatsapp",
+                input_text=incoming_text,
+                verdict=response.verdict,
+                user_id=user_id,
+                location={
+                    "orchestrator": {
+                        "tool_used": response.tool_used,
+                        "channel": "whatsapp",
+                    }
+                },
+                latency_ms=timer.elapsed_ms,
             )
-        await reset_session(phone, clear_history=False)
+            if user_id:
+                await save_check_for_user(
+                    user_id,
+                    response.verdict.agent,
+                    incoming_text,
+                    response.verdict,
+                )
+            await reset_session(phone, clear_history=False)
+    except Exception as exc:
+        logger.exception("WhatsApp post-reply bookkeeping failed: %s", exc)
