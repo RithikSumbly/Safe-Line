@@ -76,17 +76,11 @@ export function Sidebar() {
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     cn(
       "nav-tip group relative z-10 flex h-10 items-center gap-3 rounded-[8px] px-3 transition-[color,transform] duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
-      "hover:scale-105",
-      isActive
-        ? "font-medium text-ink"
-        : "text-ink/50 hover:text-ink/75",
+      "hover:scale-105 hover:text-verified",
+      isActive ? "text-ink" : "text-ink/55",
     );
 
-  const iconClass = (isActive: boolean) =>
-    cn(
-      "h-5 w-5 shrink-0 transition-colors",
-      isActive ? "text-verified" : "text-current",
-    );
+  const iconClass = () => "h-5 w-5 shrink-0";
 
   return (
     <aside
@@ -130,7 +124,7 @@ export function Sidebar() {
       <nav className="relative flex flex-1 flex-col px-2 pb-4">
         {pill.visible && (
           <div
-            className="absolute left-2 right-2 rounded-[8px] border border-alive/30 bg-alive/25 shadow-[0_0_20px_rgb(var(--color-alive-rgb)/0.3)] transition-[top,height] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+            className="nav-active-pill absolute left-2 right-2 rounded-[8px] bg-alive/15 shadow-[0_0_20px_rgba(0,212,184,0.25)] transition-[top,height] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
             style={{ top: pill.top, height: pill.height }}
             aria-hidden
           />
@@ -149,8 +143,8 @@ export function Sidebar() {
             {({ isActive }) => (
               <>
                 <Icon
-                  className={iconClass(isActive)}
-                  strokeWidth={isActive ? 2.25 : 1.5}
+                  className={iconClass()}
+                  strokeWidth={isActive ? 2 : 1.5}
                 />
                 <span
                   className={cn(
@@ -205,8 +199,8 @@ export function Sidebar() {
               {({ isActive }) => (
                 <>
                   <Icon
-                    className={iconClass(isActive)}
-                    strokeWidth={isActive ? 2.25 : 1.5}
+                    className={iconClass()}
+                    strokeWidth={isActive ? 2 : 1.5}
                   />
                   <span
                     className={cn(

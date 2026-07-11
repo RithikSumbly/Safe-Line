@@ -46,7 +46,7 @@ const CHECKERS = [
 export function LandingPage() {
   return (
     <>
-      <section className="border-b border-line bg-gradient-to-br from-verified-soft/80 via-paper to-paper">
+      <section className="landing-hero border-b border-line bg-gradient-to-br from-verified-soft/80 via-paper to-paper">
         <div className="content-shell py-12 md:py-16">
           <ScrollReveal>
             <p className="kicker">Verification desk</p>

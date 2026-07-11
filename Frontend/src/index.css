@@ -23,19 +23,34 @@
   --radius-card-lg: 8px;
 }
 
+/* Desk/default — cool neutral palette (unchanged from original) */
+html[data-theme="desk"],
+html:not([data-theme]) {
+  --color-paper: #edf0ee;
+  --color-ink: #1b2a41;
+  --color-verified: #1e6f5c;
+  --color-risk: #b23a2e;
+  --color-pending: #b8862b;
+  --color-line: #d8d5cc;
+  --color-alive: #00d4b8;
+  --color-verified-soft: #dce8e4;
+  --color-risk-soft: #ede0de;
+  --color-pending-soft: #ebe4d4;
+  --color-alive-rgb: 0 212 184;
+}
+
+/* Coffee — warm palette only when toggled on */
 html[data-theme="coffee"] {
-  --color-paper: #f6efe6;
-  --color-ink: #3d2914;
-  --color-verified: #6b5a45;
-  --color-risk: #b84a32;
-  --color-pending: #c4922a;
-  --color-line: #e2d4c3;
+  --color-paper: #faf3e8;
+  --color-ink: #2c1810;
+  --color-verified: #7a5c3a;
+  --color-risk: #c44d34;
+  --color-pending: #c8874a;
+  --color-line: #dbc9b0;
   --color-alive: #c8874a;
-
-  --color-verified-soft: #ebe3d6;
-  --color-risk-soft: #f2e2da;
-  --color-pending-soft: #f5ead8;
-
+  --color-verified-soft: #f5e6d0;
+  --color-risk-soft: #f3ddd4;
+  --color-pending-soft: #f8ead8;
   --color-alive-rgb: 200 135 74;
 }
 
@@ -52,7 +67,6 @@ html[data-theme="coffee"] {
     @apply bg-paper font-sans text-ink antialiased;
     margin: 0;
     min-height: 100svh;
-    transition: background-color 0.35s ease, color 0.35s ease;
   }
 
   #root {
@@ -109,6 +123,19 @@ html[data-theme="coffee"] {
 
   .chat-surface {
     @apply rounded-[var(--radius-card-lg)] border border-line bg-paper shadow-sm;
+  }
+
+  html[data-theme="coffee"] .nav-active-pill {
+    @apply border border-pending/35 bg-pending/20 shadow-[0_0_16px_rgb(var(--color-alive-rgb)/0.22)];
+  }
+
+  html[data-theme="coffee"] .landing-hero {
+    background: linear-gradient(
+      to bottom right,
+      color-mix(in srgb, var(--color-pending-soft) 75%, transparent),
+      var(--color-paper) 55%,
+      var(--color-paper)
+    );
   }
 
   html[data-theme="coffee"] .accent-bar {

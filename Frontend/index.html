@@ -15,9 +15,11 @@
   <body>
     <script>
       try {
-        if (localStorage.getItem("safeline-theme") === "coffee") {
-          document.documentElement.setAttribute("data-theme", "coffee");
-        }
+        var theme = localStorage.getItem("safeline-theme");
+        document.documentElement.setAttribute(
+          "data-theme",
+          theme === "coffee" ? "coffee" : "desk"
+        );
       } catch (e) {}
     </script>
     <div id="root"></div>

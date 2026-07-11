@@ -18,7 +18,7 @@ export function ThemeToggle({ className, showLabel = true }: ThemeToggleProps) {
         "inline-flex items-center gap-2 rounded-[6px] border border-line px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-colors",
         isCoffee
           ? "bg-pending/15 text-ink hover:bg-pending/25"
-          : "bg-ink/[0.03] text-ink/55 hover:bg-ink/[0.06] hover:text-ink",
+          : "bg-transparent text-ink/45 hover:bg-ink/[0.04] hover:text-ink/70",
         className,
       )}
       aria-label={isCoffee ? "Switch to desk mode" : "Switch to coffee mode"}
@@ -31,7 +31,7 @@ export function ThemeToggle({ className, showLabel = true }: ThemeToggleProps) {
             "h-2.5 w-2.5 rounded-full transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
             isCoffee
               ? "translate-x-3 bg-pending"
-              : "translate-x-0 bg-verified",
+              : "translate-x-0 bg-ink/25",
           )}
           aria-hidden
         />
@@ -51,13 +51,12 @@ export function ThemeToggle({ className, showLabel = true }: ThemeToggleProps) {
           )}
         </span>
       )}
-      {!showLabel && (
-        isCoffee ? (
+      {!showLabel &&
+        (isCoffee ? (
           <Coffee className="h-3.5 w-3.5" strokeWidth={2} />
         ) : (
           <Sun className="h-3.5 w-3.5" strokeWidth={2} />
-        )
-      )}
+        ))}
     </button>
   );
 }

@@ -31,11 +31,7 @@ function readStoredTheme(): SiteTheme {
 
 function applyTheme(theme: SiteTheme) {
   const root = document.documentElement;
-  if (theme === "coffee") {
-    root.setAttribute("data-theme", "coffee");
-  } else {
-    root.removeAttribute("data-theme");
-  }
+  root.setAttribute("data-theme", theme === "coffee" ? "coffee" : "desk");
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
