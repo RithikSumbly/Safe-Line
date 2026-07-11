@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import logging
@@ -14,6 +15,11 @@ from app.whatsapp.pipeline import InboundMessage, Messenger, handle_inbound
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
+
+# Keep background tasks alive on HF Spaces.
+_background_tasks: set[asyncio.Task[None]] = set()
+
+_META_TIMEOUT = httpx.Timeout(connect=60.0, read=60.0, write=30.0, pool=60.0)
 
 # In-memory debug counters (resets on redeploy) — confirms Meta is hitting the server.
 _last_webhook_at: str | None = None
@@ -52,45 +58,65 @@ class MetaMessenger(Messenger):
                 body[:80],
             )
             return
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            res = await client.post(
-                f"https://graph.facebook.com/v21.0/{settings.meta_phone_number_id}/messages",
-                headers={"Authorization": f"Bearer {settings.meta_whatsapp_token}"},
-                json={
-                    "messaging_product": "whatsapp",
-                    "to": to,
-                    "type": "text",
-                    "text": {"body": body},
-                },
-            )
-            if res.status_code >= 400:
-                _last_send_error = f"{res.status_code}: {res.text[:200]}"
-                logger.error(
-                    "WhatsApp send failed (%s): %s",
-                    res.status_code,
-                    res.text[:300],
+
+        url = f"https://graph.facebook.com/v21.0/{settings.meta_phone_number_id}/messages"
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "text",
+            "text": {"body": body},
+        }
+        headers = {"Authorization": f"Bearer {settings.meta_whatsapp_token}"}
+
+        last_exc: Exception | None = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=_META_TIMEOUT) as client:
+                    res = await client.post(url, headers=headers, json=payload)
+                if res.status_code >= 400:
+                    _last_send_error = f"{res.status_code}: {res.text[:200]}"
+                    logger.error(
+                        "WhatsApp send failed (%s): %s",
+                        res.status_code,
+                        res.text[:300],
+                    )
+                    raise RuntimeError(_last_send_error)
+                _last_send_error = None
+                logger.info("WhatsApp sent reply to %s (%d chars)", to[-4:], len(body))
+                return
+            except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.NetworkError) as exc:
+                last_exc = exc
+                _last_send_error = str(exc)
+                logger.warning(
+                    "WhatsApp send attempt %d/3 failed for %s: %s",
+                    attempt + 1,
+                    to[-4:],
+                    exc,
                 )
-                raise RuntimeError(_last_send_error)
-            _last_send_error = None
-            logger.info("WhatsApp sent reply to %s (%d chars)", to[-4:], len(body))
+                if attempt < 2:
+                    await asyncio.sleep(2 ** attempt)
+
+        raise RuntimeError(f"WhatsApp send failed after retries: {last_exc}") from last_exc
 
     async def send_typing(self, to: str, message_id: str) -> None:
+        # Best-effort only — never block replies on typing indicator.
         settings = get_settings()
-        if not settings.meta_whatsapp_token or not settings.meta_phone_number_id:
+        if not settings.meta_whatsapp_token or not settings.meta_phone_number_id or not message_id:
             return
-        if not message_id:
-            return
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            await client.post(
-                f"https://graph.facebook.com/v21.0/{settings.meta_phone_number_id}/messages",
-                headers={"Authorization": f"Bearer {settings.meta_whatsapp_token}"},
-                json={
-                    "messaging_product": "whatsapp",
-                    "status": "read",
-                    "message_id": message_id,
-                    "typing_indicator": {"type": "text"},
-                },
-            )
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+                await client.post(
+                    f"https://graph.facebook.com/v21.0/{settings.meta_phone_number_id}/messages",
+                    headers={"Authorization": f"Bearer {settings.meta_whatsapp_token}"},
+                    json={
+                        "messaging_product": "whatsapp",
+                        "status": "read",
+                        "message_id": message_id,
+                        "typing_indicator": {"type": "text"},
+                    },
+                )
+        except Exception as exc:
+            logger.debug("Typing indicator skipped: %s", exc)
 
 
 async def _send_whatsapp_text(to: str, body: str) -> None:
@@ -143,10 +169,34 @@ async def _process_message(phone: str, message_id: str, *, text: str = "", image
         )
     except Exception as exc:
         logger.exception("WhatsApp processing failed for %s: %s", phone[-4:], exc)
-        await messenger.send_text(
+        try:
+            await messenger.send_text(
+                phone,
+                "Sorry — I couldn't process that message. Please try again.",
+            )
+        except Exception as send_exc:
+            logger.error("Could not send error reply to %s: %s", phone[-4:], send_exc)
+
+
+def _spawn_message_task(
+    phone: str,
+    message_id: str,
+    *,
+    text: str = "",
+    image_bytes: bytes | None = None,
+    pdf_bytes: bytes | None = None,
+) -> None:
+    task = asyncio.create_task(
+        _process_message(
             phone,
-            "Sorry — I couldn't process that message. Please try again.",
+            message_id,
+            text=text,
+            image_bytes=image_bytes,
+            pdf_bytes=pdf_bytes,
         )
+    )
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 
 def _extract_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -247,8 +297,8 @@ async def receive_webhook(request: Request):
 
         if phone and (text or pdf_bytes or image_bytes):
             logger.info("WhatsApp inbound from %s type=%s", phone[-4:], msg_type)
-            # Await processing so HF Space does not drop background tasks before reply.
-            await _process_message(
+            # Ack Meta immediately; process + send reply in a tracked background task.
+            _spawn_message_task(
                 phone,
                 message_id,
                 text=text,
