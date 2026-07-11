@@ -145,12 +145,39 @@ async def _try_transports(
     raise RuntimeError("; ".join(errors))
 
 
+async def _post_via_relay(payload: dict[str, Any]) -> tuple[int, str, str]:
+    settings = get_settings()
+    relay_url = settings.whatsapp_send_relay_url
+    relay_secret = settings.whatsapp_relay_secret
+    if not relay_url or not relay_secret:
+        raise RuntimeError("WhatsApp relay is not configured")
+
+    relay_body = {
+        "to": payload["to"],
+        "body": payload["text"]["body"],
+    }
+    async with httpx.AsyncClient(timeout=httpx.Timeout(connect=20.0, read=60.0)) as client:
+        res = await client.post(
+            relay_url,
+            headers={
+                "Content-Type": "application/json",
+                "X-Relay-Secret": relay_secret,
+            },
+            json=relay_body,
+        )
+    return res.status_code, res.text, "vercel-relay"
+
+
 async def _post_graph_api(
     url: str,
     headers: dict[str, str],
     payload: dict[str, Any],
 ) -> tuple[int, str, str]:
     """POST to Graph API. Returns (status_code, body, transport)."""
+    settings = get_settings()
+    if _running_on_hf() and settings.whatsapp_send_relay_url and settings.whatsapp_relay_secret:
+        return await _post_via_relay(payload)
+
     if _running_on_hf():
         return await _try_transports(
             url,
@@ -477,9 +504,14 @@ async def whatsapp_status():
         "last_webhook_at": _last_webhook_at,
         "last_webhook_from": _last_webhook_from,
         "last_send_error": _last_send_error,
+        "relay_configured": bool(
+            settings.whatsapp_send_relay_url and settings.whatsapp_relay_secret
+        ),
+        "running_on_hf": _running_on_hf(),
         "hint": (
-            "If last_webhook_at stays null when you message the bot, Meta is not "
-            "delivering to the callback URL — configure WhatsApp → Configuration."
+            "HF Spaces cannot reach graph.facebook.com directly. Set "
+            "WHATSAPP_SEND_RELAY_URL + WHATSAPP_RELAY_SECRET on HF and matching "
+            "secrets on Vercel (/api/whatsapp/send)."
         ),
     }
 

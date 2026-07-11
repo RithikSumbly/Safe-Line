@@ -67,7 +67,15 @@ Outbound messages (templates) work once `META_WHATSAPP_TOKEN` and `META_PHONE_NU
 
    Verify with `GET /<WABA_ID>/subscribed_apps` — your app (e.g. "Safe Line") must appear.
    If only "WA DevX Webhook Events" is listed, live messages will not reach your server.
-5. Send **hi** to your WhatsApp number — you should get the help menu within a few seconds.
+5. **HF Spaces relay (required for live replies):** HF containers cannot open TLS to `graph.facebook.com`. Outbound sends go through Vercel:
+
+   - Deploy `Frontend/api/whatsapp/send.ts` (included in the frontend)
+   - On **Vercel** (server env, not `VITE_*`): `META_WHATSAPP_TOKEN`, `META_PHONE_NUMBER_ID`, `WHATSAPP_RELAY_SECRET`
+   - On **HF Space secrets**: `WHATSAPP_SEND_RELAY_URL=https://safe-line-khaki.vercel.app/api/whatsapp/send`, `WHATSAPP_RELAY_SECRET` (same value as Vercel)
+
+   Check `GET /whatsapp/status` — `relay_configured` must be `true` on HF.
+
+6. Send **hi** to your WhatsApp number — you should get the help menu within a few seconds.
 
 If inbound messages are never answered, check HF Space logs for `Invalid signature` — that means `META_APP_SECRET` is wrong.
 

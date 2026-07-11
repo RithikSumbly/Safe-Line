@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     meta_verify_token: str = "safeline-verify-token"
     meta_app_secret: str = ""
 
+    # HF Spaces cannot reach graph.facebook.com — relay sends via Vercel instead.
+    whatsapp_send_relay_url: str = ""
+    whatsapp_relay_secret: str = ""
+
     upstash_redis_url: str = ""
     upstash_redis_token: str = ""
 
@@ -57,6 +61,8 @@ class Settings(BaseSettings):
         self.meta_phone_number_id = self.meta_phone_number_id.strip()
         self.meta_verify_token = self.meta_verify_token.strip()
         self.meta_app_secret = self.meta_app_secret.strip()
+        self.whatsapp_send_relay_url = self.whatsapp_send_relay_url.strip()
+        self.whatsapp_relay_secret = self.whatsapp_relay_secret.strip()
         return self
 
     @property
