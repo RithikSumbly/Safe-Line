@@ -30,6 +30,20 @@ class ScamSynthesis(BaseModel):
     explanation: str
     recommended_action: str
     needs_human_review: bool = False
+    family_friendly_rewrite: str = ""
+
+
+def _default_family_rewrite(status: str) -> str:
+    if status in ("high_risk", "medium_risk"):
+        return (
+            "Heads up: I got a suspicious message that looks like a scam. "
+            "Please don't click any links or send money. Delete it and, if needed, "
+            "report at cybercrime.gov.in or call 1930."
+        )
+    return (
+        "FYI: I checked a message and it looks okay, but always verify bank or "
+        "payment alerts through the official app or website before acting."
+    )
 
 
 async def run_scam_agent(inp: CheckInput) -> AnnotatedVerdict:
@@ -80,7 +94,9 @@ async def run_scam_agent(inp: CheckInput) -> AnnotatedVerdict:
         synth = await llm.structured_json(
             system=(
                 "Synthesize a scam verdict from evidence. status must be one of: "
-                "high_risk, medium_risk, low_risk, likely_safe, unverified."
+                "high_risk, medium_risk, low_risk, likely_safe, unverified. "
+                "Include a calm family_friendly_rewrite (2-3 sentences) the user can "
+                "forward to relatives in a WhatsApp group. No panic, no links."
             ),
             user=(
                 f"Message:\n{text}\n\nSignals: {signals.model_dump()}\n\n"
@@ -97,6 +113,8 @@ async def run_scam_agent(inp: CheckInput) -> AnnotatedVerdict:
             explanation=synth.explanation,
             recommended_action=synth.recommended_action,
             needs_human_review=synth.needs_human_review,
+            family_friendly_rewrite=synth.family_friendly_rewrite
+            or _default_family_rewrite(synth.status),
         )
     except Exception:
         draft = VerdictDraft(
@@ -114,6 +132,7 @@ async def run_scam_agent(inp: CheckInput) -> AnnotatedVerdict:
                 "Do not click any links. Delete the message and report at cybercrime.gov.in or call 1930."
             ),
             needs_human_review=not evidence,
+            family_friendly_rewrite=_default_family_rewrite(status),
         )
 
     return await finalize_verdict("scam", text, draft)

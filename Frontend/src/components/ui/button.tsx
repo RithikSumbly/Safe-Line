@@ -9,7 +9,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-verified text-paper hover:bg-verified/90 hover:shadow-[0_0_16px_rgba(0,212,184,0.28)] active:shadow-[0_0_22px_rgba(0,212,184,0.4)]",
+          "bg-verified text-paper hover:bg-verified/90 hover:shadow-[0_0_16px_rgb(var(--color-alive-rgb)/0.28)] active:shadow-[0_0_22px_rgb(var(--color-alive-rgb)/0.4)]",
         outline:
           "border border-ink/25 bg-transparent text-ink hover:bg-ink/[0.04]",
         ghost: "text-ink hover:bg-ink/[0.04]",

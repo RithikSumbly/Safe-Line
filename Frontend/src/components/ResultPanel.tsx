@@ -5,6 +5,7 @@ import type { AnnotatedVerdict } from "@/types/agent";
 interface ResultPanelProps {
   state: "idle" | "loading" | "done" | "error";
   verdict: AnnotatedVerdict | null;
+  runId?: string | null;
   error: string | null;
   checkKey: number;
   emptyMessage?: string;
@@ -13,6 +14,7 @@ interface ResultPanelProps {
 export function ResultPanel({
   state,
   verdict,
+  runId,
   error,
   checkKey,
   emptyMessage = "Paste a message above and press Check this to see a cited verdict here.",
@@ -44,6 +46,7 @@ export function ResultPanel({
       <AnnotatedVerdictCard
         key={checkKey}
         verdict={verdict}
+        runId={runId}
         animate
       />
     );

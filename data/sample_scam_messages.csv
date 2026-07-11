@@ -1,0 +1,19 @@
+message,channel,requested_action,money_request,urgency_words,link_present,risk_label
+"URGENT: Your SBI account KYC has expired. Pay Rs 5000 at http://fake-sbi-kyc.xyz or account will be blocked in 2 hours.",SMS,click link and pay,true,urgent|blocked|expired,true,high_risk
+"Congratulations! You won Rs 25 lakh in Lucky Draw. Share bank details and pay processing fee Rs 2999 to claim.",WhatsApp,share bank details and pay,true,congratulations|claim now,true,high_risk
+"Hi Mum, I lost my phone. Please UPI Rs 15000 to this number urgently. Will explain later.",WhatsApp,send money via UPI,true,urgent|lost phone,false,high_risk
+"Amazon: Your package delivery failed. Update address and pay Rs 49 re-delivery fee: http://amzn-deliv.fake",SMS,click link and pay,true,delivery failed|update now,true,high_risk
+"IT Dept notice: Tax refund of Rs 48,200 pending. Verify PAN at http://income-tax-refund.fake within 24hrs.",email,click link and verify details,false,24hrs|pending|verify,true,high_risk
+"HDFC Alert: Suspicious login detected. Confirm identity at http://hdfc-secure-login.fake immediately.",SMS,click link and confirm,false,suspicious|immediately|confirm,true,high_risk
+"Work from home! Earn Rs 50,000/week. Pay Rs 2000 registration fee to join. Reply YES.",WhatsApp,pay registration fee,true,earn|limited slots,false,high_risk
+"Your Airtel bill of Rs 847 is overdue. Pay now at http://airtel-bill-pay.fake to avoid disconnection.",SMS,click link and pay,true,overdue|pay now|disconnection,true,medium_risk
+"Dear customer, your credit card reward points expire today. Redeem at http://rewards-redeem.fake",email,click link to redeem,false,expire today|redeem,true,medium_risk
+"Flipkart sale: iPhone 15 at Rs 9999. Limited stock. Order at http://flipkart-deal.fake",WhatsApp,click link to order,false,limited stock|sale,true,medium_risk
+"RBI notice: Your UPI limit will be reduced. Update KYC at http://rbi-kyc-update.fake",SMS,click link to update,false,notice|update,true,medium_risk
+"Netflix: Payment failed. Update billing info at http://netflix-billing.fake to restore access.",email,click link to update payment,false,payment failed|restore,true,medium_risk
+"Swiggy: Your order #4821 is out for delivery. Track at https://track.swiggy.com/order/4821",SMS,track order,false,out for delivery,false,likely_safe
+"ICICI Bank: Rs 2,500 debited from A/c XX4821 on 10-Jul. Not you? Call 1860-120-7777",SMS,call bank if unauthorized,false,debited,false,likely_safe
+"India Post: Article RN123456789IN has been delivered. Thank you for using India Post.",SMS,none,false,delivered,false,likely_safe
+"Your OTP for SafeLine login is 847291. Valid for 10 minutes. Do not share with anyone.",SMS,enter OTP,false,OTP|do not share,false,likely_safe
+"Meeting rescheduled to 3 PM tomorrow. Join link: https://meet.google.com/abc-defg-hij",email,join meeting,false,rescheduled,false,likely_safe
+"Zerodha: Your mutual fund SIP of Rs 5000 was processed successfully. Ref: MF20240711001.",email,none,false,processed successfully,false,likely_safe

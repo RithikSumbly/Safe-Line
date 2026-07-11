@@ -3,26 +3,27 @@ import {
   Info,
   LayoutDashboard,
   MessageCircle,
-  MessageSquare,
+  Phone,
   Pin,
   PinOff,
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { WHATSAPP_NUMBER } from "@/components/WhatsAppMockup";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/cn";
 
 const NAV_MAIN = [
   { to: "/", label: "Home", icon: Home, end: true },
-  { to: "/chat", label: "Check a message", icon: MessageSquare },
+  { to: "/chat", label: "Check a message", icon: MessageCircle },
 ] as const;
 
 const NAV_BOTTOM = [
   {
     href: `https://wa.me/${WHATSAPP_NUMBER}`,
     label: "WhatsApp desk",
-    icon: MessageCircle,
+    icon: Phone,
     external: true,
   },
   { to: "/dashboard", label: "Archive", icon: LayoutDashboard },
@@ -74,9 +75,17 @@ export function Sidebar() {
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     cn(
-      "group relative z-10 flex h-10 items-center gap-3 rounded-[8px] px-3 transition-[color,transform] duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
-      "hover:scale-105 hover:text-verified",
-      isActive ? "text-ink" : "text-ink/55",
+      "nav-tip group relative z-10 flex h-10 items-center gap-3 rounded-[8px] px-3 transition-[color,transform] duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
+      "hover:scale-105",
+      isActive
+        ? "font-medium text-ink"
+        : "text-ink/50 hover:text-ink/75",
+    );
+
+  const iconClass = (isActive: boolean) =>
+    cn(
+      "h-5 w-5 shrink-0 transition-colors",
+      isActive ? "text-verified" : "text-current",
     );
 
   return (
@@ -118,7 +127,7 @@ export function Sidebar() {
       <nav className="relative flex flex-1 flex-col px-2 pb-4">
         {pill.visible && (
           <div
-            className="absolute left-2 right-2 rounded-[8px] bg-alive/15 shadow-[0_0_20px_rgba(0,212,184,0.25)] transition-[top,height] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+            className="absolute left-2 right-2 rounded-[8px] border border-alive/30 bg-alive/25 shadow-[0_0_20px_rgb(var(--color-alive-rgb)/0.3)] transition-[top,height] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
             style={{ top: pill.top, height: pill.height }}
             aria-hidden
           />
@@ -130,17 +139,26 @@ export function Sidebar() {
             to={to}
             end={"end" in rest}
             ref={setRef(to)}
+            title={label}
+            data-tip={expanded ? undefined : label}
             className={linkClass}
           >
-            <Icon className="h-5 w-5 shrink-0" strokeWidth={1.5} />
-            <span
-              className={cn(
-                "whitespace-nowrap font-mono text-[10px] uppercase tracking-wider transition-opacity",
-                expanded ? "opacity-100" : "pointer-events-none opacity-0",
-              )}
-            >
-              {label}
-            </span>
+            {({ isActive }) => (
+              <>
+                <Icon
+                  className={iconClass(isActive)}
+                  strokeWidth={isActive ? 2.25 : 1.5}
+                />
+                <span
+                  className={cn(
+                    "whitespace-nowrap font-mono text-[10px] uppercase tracking-wider transition-opacity",
+                    expanded ? "opacity-100" : "pointer-events-none opacity-0",
+                  )}
+                >
+                  {label}
+                </span>
+              </>
+            )}
           </NavLink>
         ))}
 
@@ -155,7 +173,9 @@ export function Sidebar() {
                 href={item.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={linkClass({ isActive: false })}
+                title={item.label}
+                data-tip={expanded ? undefined : item.label}
+                className={cn(linkClass({ isActive: false }), "nav-tip")}
               >
                 <Icon className="h-5 w-5 shrink-0" strokeWidth={1.5} />
                 <span
@@ -175,21 +195,37 @@ export function Sidebar() {
               key={to}
               to={to}
               ref={setRef(to)}
+              title={item.label}
+              data-tip={expanded ? undefined : item.label}
               className={linkClass}
             >
-              <Icon className="h-5 w-5 shrink-0" strokeWidth={1.5} />
-              <span
-                className={cn(
-                  "whitespace-nowrap font-mono text-[10px] uppercase tracking-wider transition-opacity",
-                  expanded ? "opacity-100" : "opacity-0",
-                )}
-              >
-                {item.label}
-              </span>
+              {({ isActive }) => (
+                <>
+                  <Icon
+                    className={iconClass(isActive)}
+                    strokeWidth={isActive ? 2.25 : 1.5}
+                  />
+                  <span
+                    className={cn(
+                      "whitespace-nowrap font-mono text-[10px] uppercase tracking-wider transition-opacity",
+                      expanded ? "opacity-100" : "pointer-events-none opacity-0",
+                    )}
+                  >
+                    {item.label}
+                  </span>
+                </>
+              )}
             </NavLink>
           );
         })}
       </nav>
+
+      <div className="border-t border-line px-2 py-3">
+        <ThemeToggle
+          showLabel={expanded}
+          className={cn("w-full justify-center", !expanded && "px-2")}
+        />
+      </div>
     </aside>
   );
 }

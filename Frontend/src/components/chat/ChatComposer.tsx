@@ -1,8 +1,12 @@
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { extractUrls, urlHostname } from "@/lib/extractUrls";
 import { cn } from "@/lib/cn";
+
+const LINE_HEIGHT_PX = 24;
+const MAX_LINES = 6;
+const MAX_HEIGHT_PX = LINE_HEIGHT_PX * MAX_LINES;
 
 interface ChatComposerProps {
   onSend: (text: string) => void;
@@ -12,7 +16,18 @@ interface ChatComposerProps {
 
 export function ChatComposer({ onSend, loading, className }: ChatComposerProps) {
   const [text, setText] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const urls = useMemo(() => extractUrls(text), [text]);
+  const canSend = Boolean(text.trim()) && !loading;
+
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const next = Math.min(el.scrollHeight, MAX_HEIGHT_PX);
+    el.style.height = `${next}px`;
+    el.style.overflowY = el.scrollHeight > MAX_HEIGHT_PX ? "auto" : "hidden";
+  }, [text]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,13 +58,14 @@ export function ChatComposer({ onSend, loading, className }: ChatComposerProps) 
             ))}
           </div>
         )}
-        <div className="flex gap-3 items-end">
+        <div className="flex items-end gap-3">
           <Textarea
+            ref={textareaRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Paste or forward a suspicious message…"
-            rows={3}
-            className="min-h-[80px] flex-1 resize-none"
+            rows={2}
+            className="min-h-[48px] flex-1 resize-none py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-verified/35 focus-visible:ring-offset-1"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -57,7 +73,16 @@ export function ChatComposer({ onSend, loading, className }: ChatComposerProps) 
               }
             }}
           />
-          <Button type="submit" disabled={loading || !text.trim()} className="shrink-0">
+          <Button
+            type="submit"
+            disabled={!canSend}
+            className={cn(
+              "shrink-0 disabled:pointer-events-none disabled:opacity-100",
+              canSend
+                ? "bg-verified text-paper hover:bg-verified/90"
+                : "border border-line bg-ink/10 text-ink/35 hover:bg-ink/10",
+            )}
+          >
             {loading ? "Checking…" : "Send"}
           </Button>
         </div>

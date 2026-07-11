@@ -1,6 +1,8 @@
-import { Check, ExternalLink, X } from "lucide-react";
+import { Check, Copy, ExternalLink, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { submitFeedback } from "@/lib/feedbackApi";
+import { confidenceBarClass, riskScoreBarClass } from "@/lib/riskSemantics";
 import { cn } from "@/lib/cn";
 import type { AnnotatedVerdict, FlaggedSpan } from "@/types/agent";
 import { STATUS_STAMP, STATUS_SUMMARY, toSuperscript } from "@/types/agent";
@@ -10,6 +12,7 @@ interface AnnotatedVerdictCardProps {
   animate?: boolean;
   condensed?: boolean;
   className?: string;
+  runId?: string | null;
 }
 
 const SEVERITY_COLORS = {
@@ -69,10 +72,13 @@ export function AnnotatedVerdictCard({
   animate = true,
   condensed = false,
   className,
+  runId,
 }: AnnotatedVerdictCardProps) {
   const reduced = usePrefersReducedMotion();
   const [ready, setReady] = useState(!animate);
   const [barReady, setBarReady] = useState(!animate);
+  const [feedbackState, setFeedbackState] = useState<"idle" | "submitting" | "done">("idle");
+  const [copied, setCopied] = useState(false);
   const stamp = STATUS_STAMP[verdict.status];
   const isHighRisk =
     stamp.color === "risk" &&
@@ -91,6 +97,29 @@ export function AnnotatedVerdictCard({
   );
   const showHighlights =
     verdict.flagged_spans.length > 0 && verdict.red_flags.length > 0;
+  const familyRewrite = verdict.family_friendly_rewrite?.trim();
+
+  async function handleFeedback(helpful: boolean) {
+    if (!runId || feedbackState !== "idle") return;
+    setFeedbackState("submitting");
+    try {
+      await submitFeedback(runId, helpful);
+      setFeedbackState("done");
+    } catch {
+      setFeedbackState("idle");
+    }
+  }
+
+  async function copyFamilyMessage() {
+    if (!familyRewrite) return;
+    try {
+      await navigator.clipboard.writeText(familyRewrite);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore
+    }
+  }
 
   useEffect(() => {
     if (!animate) {
@@ -123,36 +152,35 @@ export function AnnotatedVerdictCard({
         className,
       )}
     >
-      <div className="flex items-center justify-between border-b border-line px-5 py-2.5 md:px-6">
-        <span className="kicker">Filed verdict</span>
-        <span className="font-mono text-[10px] text-ink/40">
-          {verdict.agent.replace("_", " ")} · risk {verdict.risk_score}
-        </span>
-      </div>
-
-      <div className="relative p-5 md:p-6 md:pt-7">
-        <div className="pointer-events-none absolute -top-3 right-4 h-[72px] w-[72px]">
+      <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-2.5 md:px-6">
+        <div className="min-w-0 flex-1">
+          <span className="kicker">Filed verdict</span>
+          <span className="mt-1 block font-mono text-[10px] text-ink/40">
+            {verdict.agent.replace("_", " ")} · risk {verdict.risk_score}
+          </span>
+        </div>
+        <div className="relative h-14 w-14 shrink-0">
           {isHighRisk && ready && (
             <span
-              className="absolute inset-0 rounded-full border-2 border-risk/40 animate-[risk-ring-pulse_2s_ease-in-out_infinite]"
+              className="pointer-events-none absolute inset-0 rounded-full border-2 border-risk/40 animate-[risk-ring-pulse_2s_ease-in-out_infinite]"
               aria-hidden
             />
           )}
           {stamp.color === "verified" && ready && (
             <span
-              className="absolute inset-0 rounded-full shadow-[0_0_18px_rgba(30,111,92,0.35)]"
+              className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_18px_rgba(30,111,92,0.35)]"
               aria-hidden
             />
           )}
           {animate && ready && !reduced && (
             <span
-              className="absolute left-1/2 top-1/2 h-[72px] w-[72px] rounded-full bg-alive/25 animate-[stamp-ripple_0.45s_ease-out_forwards]"
+              className="pointer-events-none absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full bg-alive/25 animate-[stamp-ripple_0.45s_ease-out_forwards]"
               aria-hidden
             />
           )}
           <div
             className={cn(
-              "stamp-grain relative flex h-[72px] w-[72px] items-center justify-center rounded-full border-4 border-double text-center",
+              "stamp-grain relative flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-double text-center",
               STAMP_COLORS[stamp.color],
               animate &&
                 ready &&
@@ -163,18 +191,20 @@ export function AnnotatedVerdictCard({
             style={animate && !ready ? { opacity: 0 } : undefined}
             aria-label={`Verdict: ${stamp.label}`}
           >
-            <span className="px-1 font-mono text-[9px] font-medium leading-tight tracking-wide">
+            <span className="px-0.5 font-mono text-[8px] font-medium leading-tight tracking-wide">
               {stamp.label}
             </span>
           </div>
         </div>
+      </div>
 
-        <p className="mb-4 pr-16 font-sans text-sm leading-relaxed text-ink/70">
+      <div className="relative p-5 md:p-6">
+        <p className="mb-4 font-sans text-sm leading-relaxed text-ink/70">
           {STATUS_SUMMARY[verdict.status]}
         </p>
 
         {verdict.explanation && (
-          <div className="mb-6 pr-16">
+          <div className="mb-6">
             <h3 className="kicker mb-2">Summary</h3>
             <p className="font-sans text-sm leading-relaxed text-ink">
               {verdict.explanation}
@@ -182,7 +212,7 @@ export function AnnotatedVerdictCard({
           </div>
         )}
 
-        <div className="mb-6 pr-16">
+        <div className="mb-6">
           <h3 className="kicker mb-2">Your message</h3>
           {showHighlights && (
             <p className="mb-2 font-mono text-[10px] text-ink/45">
@@ -341,9 +371,7 @@ export function AnnotatedVerdictCard({
               <div
                 className={cn(
                   "h-full transition-[width] duration-[900ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:transition-none",
-                  stamp.color === "risk" && "bg-risk",
-                  stamp.color === "verified" && "bg-verified",
-                  stamp.color === "pending" && "bg-pending",
+                  confidenceBarClass(),
                 )}
                 style={{
                   width: barReady
@@ -360,7 +388,10 @@ export function AnnotatedVerdictCard({
             </div>
             <div className="h-1.5 w-full overflow-hidden bg-line">
               <div
-                className="h-full bg-ink/70 transition-[width] duration-[900ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:transition-none"
+                className={cn(
+                  "h-full transition-[width] duration-[900ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:transition-none",
+                  riskScoreBarClass(verdict.risk_score),
+                )}
                 style={{
                   width: barReady ? `${verdict.risk_score}%` : "0%",
                 }}
@@ -391,7 +422,54 @@ export function AnnotatedVerdictCard({
           )}
         </div>
 
+        {verdict.agent === "scam" && familyRewrite && (
+          <div className="mb-6 border-t border-line pt-6">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="kicker">Message for family</h3>
+              <button
+                type="button"
+                onClick={() => void copyFamilyMessage()}
+                className="inline-flex items-center gap-1 font-mono text-[10px] text-verified hover:underline"
+              >
+                <Copy className="h-3 w-3" />
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <p className="font-sans text-sm leading-relaxed text-ink whitespace-pre-wrap">
+              {familyRewrite}
+            </p>
+          </div>
+        )}
+
         <p className="font-mono text-[11px] text-ink/40">{verdict.disclaimer}</p>
+
+        {runId && (
+          <div className="mt-4 border-t border-line pt-4">
+            {feedbackState === "done" ? (
+              <p className="font-sans text-xs text-ink/50">Thanks for your feedback.</p>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="font-sans text-xs text-ink/60">Was this helpful?</span>
+                <button
+                  type="button"
+                  disabled={feedbackState === "submitting"}
+                  onClick={() => void handleFeedback(true)}
+                  className="rounded border border-verified/40 px-3 py-1 font-mono text-xs text-verified hover:bg-verified/[0.06] disabled:opacity-50"
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  disabled={feedbackState === "submitting"}
+                  onClick={() => void handleFeedback(false)}
+                  className="rounded border border-line px-3 py-1 font-mono text-xs text-ink/70 hover:bg-ink/[0.04] disabled:opacity-50"
+                >
+                  No
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </article>
   );

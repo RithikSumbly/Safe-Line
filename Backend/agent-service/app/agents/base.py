@@ -16,6 +16,7 @@ class VerdictDraft(BaseModel):
     explanation: str
     recommended_action: str
     needs_human_review: bool = False
+    family_friendly_rewrite: str = ""
 
 
 async def finalize_verdict(
@@ -35,6 +36,7 @@ async def finalize_verdict(
         recommended_action=draft.recommended_action,
         needs_human_review=draft.needs_human_review,
         disclaimer="",
+        family_friendly_rewrite=draft.family_friendly_rewrite,
     )
     verdict = apply_evidence_floor(verdict)
     verdict = apply_guardrails(verdict)

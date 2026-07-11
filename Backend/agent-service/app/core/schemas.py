@@ -39,6 +39,7 @@ class AgentVerdict(BaseModel):
     recommended_action: str
     needs_human_review: bool
     disclaimer: str
+    family_friendly_rewrite: str = ""
 
 
 class FlaggedSpan(BaseModel):
@@ -99,3 +100,14 @@ class ChatMessageResponse(BaseModel):
     tool_used: Optional[ChatToolName] = None
     assistant_text: str
     verdict: Optional[AnnotatedVerdict] = None
+    run_id: Optional[str] = None
+
+
+class AgentCheckResponse(BaseModel):
+    verdict: AnnotatedVerdict
+    run_id: Optional[str] = None
+
+
+class FeedbackRequest(BaseModel):
+    run_id: str
+    helpful: bool

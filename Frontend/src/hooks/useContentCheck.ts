@@ -10,6 +10,7 @@ export function useContentCheck(agent: AgentType) {
   const { user } = useAuth();
   const [state, setState] = useState<CheckState>("idle");
   const [verdict, setVerdict] = useState<AnnotatedVerdict | null>(null);
+  const [runId, setRunId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checkKey, setCheckKey] = useState(0);
 
@@ -24,13 +25,15 @@ export function useContentCheck(agent: AgentType) {
       setState("loading");
       setError(null);
       setVerdict(null);
+      setRunId(null);
       try {
         const result = await checkContent(agent, input);
-        setVerdict(result);
+        setVerdict(result.verdict);
+        setRunId(result.run_id);
         setCheckKey((k) => k + 1);
         setState("done");
         if (user) {
-          saveCheck(user.id, agent, input.text, result).catch(() => {
+          saveCheck(user.id, agent, input.text, result.verdict).catch(() => {
             // History save failed silently — verdict still shown
           });
         }
@@ -44,5 +47,5 @@ export function useContentCheck(agent: AgentType) {
     [agent, user],
   );
 
-  return { state, verdict, error, checkKey, runCheck };
+  return { state, verdict, runId, error, checkKey, runCheck };
 }

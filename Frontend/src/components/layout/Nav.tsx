@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { WHATSAPP_NUMBER } from "@/components/WhatsAppMockup";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -18,12 +19,13 @@ export function Nav() {
           </span>
         </Link>
 
-        <div className="flex items-center gap-4 md:gap-5">
+        <div className="flex items-center gap-3 md:gap-4">
+          <ThemeToggle />
           <a
             href={`https://wa.me/${WHATSAPP_NUMBER}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-mono text-xs text-verified underline underline-offset-2 transition-colors hover:text-alive hover:shadow-[0_0_12px_rgba(0,212,184,0.35)]"
+            className="font-mono text-xs text-verified underline underline-offset-2 transition-colors hover:text-alive hover:shadow-[0_0_12px_rgb(var(--color-alive-rgb)/0.35)]"
           >
             WhatsApp desk
           </a>

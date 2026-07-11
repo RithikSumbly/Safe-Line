@@ -13,7 +13,7 @@ export function CrisisPage() {
   const [text, setText] = useState(MOCK_VERDICTS.crisis_rumor.input_text);
   const [location, setLocation] = useState("");
   const [locating, setLocating] = useState(false);
-  const { state, verdict, error, checkKey, runCheck } =
+  const { state, verdict, runId, error, checkKey, runCheck } =
     useContentCheck("crisis_rumor");
 
   const useMyLocation = () => {
@@ -86,6 +86,7 @@ export function CrisisPage() {
         <ResultPanel
           state={state}
           verdict={verdict}
+          runId={runId}
           error={error}
           checkKey={checkKey}
           emptyMessage="Paste a forward above and press Check this claim to see a cited verdict here."

@@ -85,3 +85,25 @@ export async function saveChatMessage(
     .update({ updated_at: new Date().toISOString() })
     .eq("id", sessionId);
 }
+
+export async function deleteChatSession(sessionId: string): Promise<void> {
+  const { error } = await supabase
+    .from("chat_sessions")
+    .delete()
+    .eq("id", sessionId);
+  if (error) throw error;
+}
+
+export async function renameChatSession(
+  sessionId: string,
+  title: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("chat_sessions")
+    .update({
+      title: title.slice(0, 80),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sessionId);
+  if (error) throw error;
+}

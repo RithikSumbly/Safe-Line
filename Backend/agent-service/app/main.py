@@ -11,7 +11,16 @@ from app.agents.scam import run_scam_agent
 from app.config import get_settings
 from app.chat.agent_tools import new_session_id
 from app.chat.orchestrator import handle_chat_message
-from app.core.schemas import AgentType, AnnotatedVerdict, ChatMessageRequest, ChatMessageResponse, CheckInput
+from app.core.schemas import (
+    AgentType,
+    AgentCheckResponse,
+    AnnotatedVerdict,
+    ChatMessageRequest,
+    ChatMessageResponse,
+    CheckInput,
+    FeedbackRequest,
+)
+from app.db.feedback import submit_verdict_feedback
 from app.db.supabase_client import Timer, log_agent_run
 from app.router_agent import classify_intent
 from app.whatsapp.meta_webhook import router as whatsapp_router
@@ -67,24 +76,25 @@ async def chat_message(req: ChatMessageRequest):
     response = await handle_chat_message(req.text, req.history, session_id)
     if response.type == "verdict" and response.verdict:
         timer = Timer()
-        await log_agent_run(
+        run_id = await log_agent_run(
             agent=response.verdict.agent,
             channel="web",
             input_text=req.text,
             verdict=response.verdict,
             latency_ms=timer.elapsed_ms,
         )
+        response.run_id = run_id
     return response
 
 
-@app.post("/agents/{agent}", response_model=AnnotatedVerdict)
+@app.post("/agents/{agent}", response_model=AgentCheckResponse)
 async def run_agent(agent: AgentType, inp: CheckInput):
     if agent not in AGENTS:
         raise HTTPException(status_code=404, detail="Unknown agent")
     timer = Timer()
     runner = AGENTS[agent]
     verdict: AnnotatedVerdict = await runner(inp)  # type: ignore[operator]
-    await log_agent_run(
+    run_id = await log_agent_run(
         agent=agent,
         channel="web",
         input_text=inp.text,
@@ -92,4 +102,12 @@ async def run_agent(agent: AgentType, inp: CheckInput):
         location={"raw": inp.location} if inp.location else None,
         latency_ms=timer.elapsed_ms,
     )
-    return verdict
+    return AgentCheckResponse(verdict=verdict, run_id=run_id)
+
+
+@app.post("/feedback")
+async def submit_feedback(req: FeedbackRequest):
+    ok = await submit_verdict_feedback(req.run_id, req.helpful)
+    if not ok:
+        raise HTTPException(status_code=400, detail="Could not save feedback")
+    return {"status": "ok"}

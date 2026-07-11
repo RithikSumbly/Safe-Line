@@ -17,6 +17,7 @@ drop table if exists public.agent_runs cascade;
 drop table if exists public.document_chunks cascade;
 drop table if exists public.whatsapp_sessions cascade;
 drop table if exists public.eval_runs cascade;
+drop table if exists public.verdict_feedback cascade;
 drop table if exists public.checks cascade;
 drop table if exists public.profiles cascade;
 
@@ -214,6 +215,22 @@ create table public.eval_runs (
 );
 
 alter table public.eval_runs enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- Verdict feedback (service role writes only)
+-- ---------------------------------------------------------------------------
+create table public.verdict_feedback (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid not null references public.agent_runs(id) on delete cascade,
+  helpful boolean not null,
+  user_id uuid references auth.users(id) on delete set null,
+  created_at timestamptz default now(),
+  unique (run_id)
+);
+
+alter table public.verdict_feedback enable row level security;
+
+create index verdict_feedback_run_id_idx on public.verdict_feedback (run_id);
 
 -- ---------------------------------------------------------------------------
 -- Web chat sessions

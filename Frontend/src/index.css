@@ -13,12 +13,30 @@
   --color-risk-soft: #ede0de;
   --color-pending-soft: #ebe4d4;
 
+  --color-alive-rgb: 0 212 184;
+
   --font-display: "Fraunces", Georgia, serif;
   --font-sans: "IBM Plex Sans", sans-serif;
   --font-mono: "IBM Plex Mono", monospace;
 
   --radius-card: 6px;
   --radius-card-lg: 8px;
+}
+
+html[data-theme="coffee"] {
+  --color-paper: #f6efe6;
+  --color-ink: #3d2914;
+  --color-verified: #6b5a45;
+  --color-risk: #b84a32;
+  --color-pending: #c4922a;
+  --color-line: #e2d4c3;
+  --color-alive: #c8874a;
+
+  --color-verified-soft: #ebe3d6;
+  --color-risk-soft: #f2e2da;
+  --color-pending-soft: #f5ead8;
+
+  --color-alive-rgb: 200 135 74;
 }
 
 @layer base {
@@ -34,6 +52,7 @@
     @apply bg-paper font-sans text-ink antialiased;
     margin: 0;
     min-height: 100svh;
+    transition: background-color 0.35s ease, color 0.35s ease;
   }
 
   #root {
@@ -86,6 +105,39 @@
 
   .desk-panel {
     @apply border border-line border-l-[3px] border-l-verified bg-paper;
+  }
+
+  .chat-surface {
+    @apply rounded-[var(--radius-card-lg)] border border-line bg-paper shadow-sm;
+  }
+
+  html[data-theme="coffee"] .accent-bar {
+    background: linear-gradient(
+      to right,
+      var(--color-verified),
+      var(--color-pending),
+      var(--color-risk)
+    );
+  }
+
+  html[data-theme="coffee"] .chat-surface,
+  html[data-theme="coffee"] .desk-panel {
+    box-shadow: 0 1px 3px rgb(61 41 20 / 0.06), 0 4px 12px rgb(61 41 20 / 0.04);
+  }
+
+  .nav-tip {
+    @apply relative;
+  }
+
+  .nav-tip[data-tip]:not(:hover)::after {
+    content: none;
+  }
+
+  @media (min-width: 0px) {
+    .nav-tip[data-tip]:hover::after {
+      content: attr(data-tip);
+      @apply pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-[60] -translate-y-1/2 whitespace-nowrap rounded-[6px] border border-line bg-paper px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wider text-ink shadow-sm;
+    }
   }
 
   .index-row {
@@ -175,10 +227,10 @@
   0% {
     transform: scaleX(0);
     opacity: 1;
-    box-shadow: 0 0 8px rgba(0, 212, 184, 0.9);
+    box-shadow: 0 0 8px rgb(var(--color-alive-rgb) / 0.9);
   }
   40% {
-    box-shadow: 0 0 10px rgba(0, 212, 184, 0.7);
+    box-shadow: 0 0 10px rgb(var(--color-alive-rgb) / 0.7);
   }
   100% {
     transform: scaleX(1);

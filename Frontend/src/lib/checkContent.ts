@@ -1,6 +1,6 @@
 import { getMockVerdict } from "@/data/mockVerdicts";
 import { delay } from "@/lib/constants";
-import type { AgentType, AnnotatedVerdict, CheckInput } from "@/types/agent";
+import type { AgentType, CheckInput, CheckResponse } from "@/types/agent";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string | undefined;
 
@@ -17,10 +17,10 @@ function serializeInput(input: CheckInput): Record<string, string> {
 export async function checkContent(
   agent: AgentType,
   input: CheckInput,
-): Promise<AnnotatedVerdict> {
+): Promise<CheckResponse> {
   if (!API_BASE) {
     await delay(1500);
-    return getMockVerdict(agent, input);
+    return { verdict: getMockVerdict(agent, input), run_id: null };
   }
 
   const res = await fetch(`${API_BASE}/agents/${agent}`, {
@@ -35,5 +35,5 @@ export async function checkContent(
         "Check failed. Try again in a moment.",
     );
   }
-  return res.json() as Promise<AnnotatedVerdict>;
+  return res.json() as Promise<CheckResponse>;
 }

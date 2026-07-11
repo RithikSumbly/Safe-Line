@@ -11,7 +11,7 @@ import { useContentCheck } from "@/hooks/useContentCheck";
 export function JobsPage() {
   const [text, setText] = useState(MOCK_VERDICTS.job_offer.input_text);
   const [email, setEmail] = useState("");
-  const { state, verdict, error, checkKey, runCheck } =
+  const { state, verdict, runId, error, checkKey, runCheck } =
     useContentCheck("job_offer");
 
   return (
@@ -54,6 +54,7 @@ export function JobsPage() {
         <ResultPanel
           state={state}
           verdict={verdict}
+          runId={runId}
           error={error}
           checkKey={checkKey}
           emptyMessage="Paste an offer above and press Check this offer to see a cited verdict here."

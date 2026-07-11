@@ -39,6 +39,10 @@ def format_verdict_message(verdict: AgentVerdict, *, onboarding: bool = False) -
     if verdict.needs_human_review:
         parts.append("⚠️ Needs human review — evidence is thin or conflicting.")
     parts.append(verdict.recommended_action)
+    if verdict.agent == "scam" and verdict.family_friendly_rewrite:
+        rewrite = verdict.family_friendly_rewrite.strip()
+        if rewrite:
+            parts.append(f"\nShare with family:\n{rewrite}")
     if verdict.red_flags:
         parts.append("\nRed flags:")
         for flag in verdict.red_flags[:4]:

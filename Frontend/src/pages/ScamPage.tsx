@@ -11,7 +11,7 @@ import { useContentCheck } from "@/hooks/useContentCheck";
 export function ScamPage() {
   const [text, setText] = useState(HERO_SCAM_EXAMPLE);
   const [url, setUrl] = useState("");
-  const { state, verdict, error, checkKey, runCheck } = useContentCheck("scam");
+  const { state, verdict, runId, error, checkKey, runCheck } = useContentCheck("scam");
 
   return (
     <ToolPageLayout
@@ -53,6 +53,7 @@ export function ScamPage() {
         <ResultPanel
           state={state}
           verdict={verdict}
+          runId={runId}
           error={error}
           checkKey={checkKey}
         />

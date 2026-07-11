@@ -114,6 +114,7 @@ export function useChatSession() {
           content: response.assistant_text,
           messageType: response.type,
           verdict: response.verdict ?? undefined,
+          runId: response.run_id ?? undefined,
           createdAt: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, assistantMsg]);

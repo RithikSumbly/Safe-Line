@@ -11,3 +11,7 @@ export const CHAT_TAGLINE =
   "Worried about a message you received? Paste it here and we'll verify it against live sources.";
 
 export const CHAT_EMPTY_TITLE = "Paste anything suspicious";
+
+export const CHAT_EMPTY_BLURB =
+  "Forward a suspicious SMS, job offer, or rumor.\n" +
+  "We check it against live sources and send you a cited verdict.";

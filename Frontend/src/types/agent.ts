@@ -31,6 +31,7 @@ export interface AgentVerdict {
   recommended_action: string;
   needs_human_review: boolean;
   disclaimer: string;
+  family_friendly_rewrite?: string;
 }
 
 export type SpanSeverity = "risk" | "verified" | "pending";
@@ -45,6 +46,11 @@ export interface FlaggedSpan {
 export interface AnnotatedVerdict extends AgentVerdict {
   input_text: string;
   flagged_spans: FlaggedSpan[];
+}
+
+export interface CheckResponse {
+  verdict: AnnotatedVerdict;
+  run_id: string | null;
 }
 
 export interface CheckInput {
@@ -131,6 +137,7 @@ export interface ChatMessageResponse {
   tool_used?: ChatToolName | null;
   assistant_text: string;
   verdict?: AnnotatedVerdict | null;
+  run_id?: string | null;
 }
 
 export interface ThreadMessage {
@@ -139,6 +146,7 @@ export interface ThreadMessage {
   content: string;
   messageType: ChatMessageType;
   verdict?: AnnotatedVerdict;
+  runId?: string | null;
   createdAt: string;
 }
 

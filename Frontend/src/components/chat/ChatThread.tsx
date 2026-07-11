@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { CheckingSourcesLoader } from "@/components/CheckingSourcesLoader";
-import { CHAT_EMPTY_TITLE, HELP_TEXT } from "@/lib/chatCopy";
+import { CHAT_EMPTY_BLURB, CHAT_EMPTY_TITLE } from "@/lib/chatCopy";
 import type { ThreadMessage } from "@/types/agent";
 
 interface ChatThreadProps {
@@ -18,11 +18,12 @@ export function ChatThread({ messages, loading }: ChatThreadProps) {
 
   if (messages.length === 0 && !loading) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-        <p className="kicker">SafeLine chat</p>
-        <h2 className="mt-2 font-display text-xl text-ink">{CHAT_EMPTY_TITLE}</h2>
-        <p className="mt-3 max-w-md whitespace-pre-line font-sans text-sm leading-relaxed text-ink/55">
-          {HELP_TEXT}
+      <div className="flex min-h-[240px] max-h-[320px] flex-1 flex-col items-center justify-center px-6 text-center">
+        <h2 className="font-display text-lg text-ink md:text-xl">
+          {CHAT_EMPTY_TITLE}
+        </h2>
+        <p className="mt-2 max-w-sm whitespace-pre-line font-sans text-sm leading-relaxed text-ink/55">
+          {CHAT_EMPTY_BLURB}
         </p>
       </div>
     );

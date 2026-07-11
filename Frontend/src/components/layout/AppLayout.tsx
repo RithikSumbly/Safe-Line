@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
 import { Footer } from "./Footer";
 import { LiveLedgerTicker } from "./LiveLedgerTicker";
@@ -7,6 +7,8 @@ import { Sidebar } from "./Sidebar";
 
 function AppShell() {
   const { width } = useSidebar();
+  const { pathname } = useLocation();
+  const showLedger = pathname === "/";
 
   return (
     <div className="flex min-h-svh bg-paper">
@@ -20,7 +22,7 @@ function AppShell() {
           <main className="min-w-0 flex-1">
             <Outlet />
           </main>
-          <LiveLedgerTicker />
+          {showLedger && <LiveLedgerTicker />}
         </div>
         <Footer />
       </div>

@@ -18,7 +18,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               {message.content}
             </p>
           )}
-          <AnnotatedVerdictCard verdict={message.verdict} condensed animate={false} />
+          <AnnotatedVerdictCard verdict={message.verdict} runId={message.runId} condensed animate={false} />
         </div>
       </div>
     );
