@@ -50,7 +50,7 @@ export async function loadChatMessages(
 ): Promise<ThreadMessage[]> {
   const { data, error } = await supabase
     .from("chat_messages")
-    .select("id, role, content, message_type, verdict, created_at")
+    .select("id, role, content, message_type, verdict, created_at, image_data_url")
     .eq("session_id", sessionId)
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -61,6 +61,7 @@ export async function loadChatMessages(
     messageType: row.message_type as ChatMessageType,
     verdict: row.verdict as AnnotatedVerdict | undefined,
     createdAt: row.created_at as string,
+    imageDataUrl: (row.image_data_url as string | null) ?? undefined,
   }));
 }
 
@@ -70,6 +71,7 @@ export async function saveChatMessage(
   content: string,
   messageType: ChatMessageType,
   verdict?: AnnotatedVerdict,
+  imageDataUrl?: string,
 ): Promise<void> {
   const { error } = await supabase.from("chat_messages").insert({
     session_id: sessionId,
@@ -78,6 +80,7 @@ export async function saveChatMessage(
     message_type: messageType,
     verdict: verdict ?? null,
     agent: verdict?.agent ?? null,
+    image_data_url: imageDataUrl ?? null,
   });
   if (error) throw error;
   await supabase

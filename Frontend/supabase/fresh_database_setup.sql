@@ -252,6 +252,7 @@ create table public.chat_messages (
     check (message_type in ('text', 'verdict', 'clarification', 'help')),
   verdict jsonb,
   agent text,
+  image_data_url text,
   created_at timestamptz default now()
 );
 

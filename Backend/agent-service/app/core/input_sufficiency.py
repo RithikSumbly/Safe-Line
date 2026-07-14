@@ -27,10 +27,27 @@ _META_NOISE = re.compile(
 )
 
 
+_SCREENSHOT_OCR = re.compile(r"(?is)\[Screenshot text\]:\s*(.*)\Z")
+
+
+def body_for_sufficiency(text: str) -> str:
+    """Prefer OCR payload when the message is a screenshot extract."""
+    stripped = (text or "").strip()
+    match = _SCREENSHOT_OCR.search(stripped)
+    if match:
+        return match.group(1).strip()
+    return stripped
+
+
 def is_insufficient_for_check(text: str) -> bool:
     """True when there is too little substantive content to run a meaningful check."""
-    stripped = (text or "").strip()
+    stripped = body_for_sufficiency(text)
     if not stripped:
+        return True
+    # Vision failure / empty OCR placeholders should not run a fake check.
+    if re.search(r"(?i)\[Image received\]", stripped) and not _SUBSTANCE.search(
+        stripped
+    ):
         return True
     if _INJECTION.search(stripped) and not _SUBSTANCE.search(stripped):
         return True

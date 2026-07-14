@@ -21,7 +21,7 @@ Design intent: calm, cited, newsroom feel — not a flashy AI SaaS landing page.
 
 Pending UI: short replies show **Replying…**; real checks show the source-checking loader (`looksLikeLiveCheck`).
 
-Live-verified paste texts for demos: eval fixtures under `tests/eval_cases/`. Teammate deep dive: codebase docs in this folder.
+Live-verified paste texts for demos: eval fixtures under `tests/eval_cases/`. Teammate deep dive: [`PROJECT_CODEBASE_DOCUMENTATION.md`](PROJECT_CODEBASE_DOCUMENTATION.md).
 
 ---
 
@@ -35,6 +35,7 @@ Live-verified paste texts for demos: eval fixtures under `tests/eval_cases/`. Te
 | Routing | React Router v7 |
 | Auth & database | Supabase (Auth + Postgres + RLS + pgvector) |
 | Agent checks | Live `POST /agents/{agent}` and `/chat/message` when `VITE_API_BASE_URL` is set; mock fallback only if unset |
+| Agent orchestration | Custom FastAPI orchestrator (not LangGraph — `langgraph` is an unused requirements leftover) |
 | Deploy | Vercel (SPA + WhatsApp relay), Docker → Hugging Face Spaces (agent) |
 
 ---

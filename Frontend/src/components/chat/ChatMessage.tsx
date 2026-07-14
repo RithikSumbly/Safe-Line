@@ -28,33 +28,51 @@ export function ChatMessage({ message, onOpenReport }: ChatMessageProps) {
     );
   }
 
+  const imageOnly = Boolean(message.imageDataUrl) && !message.content.trim();
+
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[85%] space-y-2 rounded-[12px] px-4 py-3 font-sans text-sm leading-relaxed",
-          isUser
-            ? "bg-ink text-paper"
-            : message.messageType === "help"
-              ? "border border-verified/30 bg-verified/[0.06] text-ink"
-              : message.messageType === "clarification"
-                ? "border border-pending/40 bg-pending/[0.08] text-ink"
-                : message.messageType === "error"
-                  ? "border border-risk/30 bg-risk/[0.06] text-ink"
-                  : "border border-line bg-paper text-ink",
+          "max-w-[85%] space-y-2 font-sans text-sm leading-relaxed",
+          imageOnly
+            ? "overflow-hidden rounded-[12px]"
+            : "rounded-[12px] px-4 py-3",
+          !imageOnly &&
+            (isUser
+              ? "bg-ink text-paper"
+              : message.messageType === "help"
+                ? "border border-verified/30 bg-verified/[0.06] text-ink"
+                : message.messageType === "clarification"
+                  ? "border border-pending/40 bg-pending/[0.08] text-ink"
+                  : message.messageType === "error"
+                    ? "border border-risk/30 bg-risk/[0.06] text-ink"
+                    : "border border-line bg-paper text-ink"),
+          imageOnly && isUser && "bg-ink p-1.5",
+          imageOnly && !isUser && "border border-line bg-paper p-1.5",
         )}
       >
         {message.imageDataUrl && (
           <img
             src={message.imageDataUrl}
-            alt="Attached screenshot"
+            alt="Sent screenshot"
             className={cn(
-              "max-h-48 max-w-full rounded-md object-contain",
-              isUser ? "ring-1 ring-paper/20" : "border border-line",
+              "max-h-64 max-w-full rounded-md object-contain",
+              !imageOnly && isUser && "ring-1 ring-paper/20",
+              !imageOnly && !isUser && "border border-line",
             )}
           />
         )}
-        {message.content && <p className="whitespace-pre-wrap">{message.content}</p>}
+        {message.content.trim() && (
+          <p
+            className={cn(
+              "whitespace-pre-wrap",
+              imageOnly ? "px-2.5 pb-2 pt-1" : undefined,
+            )}
+          >
+            {message.content}
+          </p>
+        )}
       </div>
     </div>
   );

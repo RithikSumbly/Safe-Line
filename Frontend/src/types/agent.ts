@@ -148,7 +148,7 @@ export interface ThreadMessage {
   verdict?: AnnotatedVerdict;
   runId?: string | null;
   createdAt: string;
-  /** Local-only preview of a pasted/uploaded screenshot */
+  /** Screenshot shown in the sent bubble (in-session + persisted when signed in) */
   imageDataUrl?: string;
 }
 

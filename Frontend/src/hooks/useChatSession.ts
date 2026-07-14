@@ -8,6 +8,11 @@ import {
   saveChatMessage,
   setLocalSessionId,
 } from "@/lib/chatSessions";
+import {
+  cacheSessionImage,
+  clearCachedSessionImages,
+  readCachedSessionImages,
+} from "@/lib/chatImageCache";
 import { createWelcomeMessage, WELCOME_MESSAGE_ID } from "@/lib/chatCopy";
 import { looksLikeLiveCheck, type PendingKind } from "@/lib/chatIntent";
 import { saveCheck } from "@/lib/checks";
@@ -38,7 +43,7 @@ function toHistory(messages: ThreadMessage[]): ChatHistoryItem[] {
       role: m.role,
       content: m.verdict
         ? `${m.content}\n[Verdict: ${m.verdict.status}]`
-        : m.content,
+        : m.content || (m.imageDataUrl ? "[User sent a screenshot]" : ""),
     }));
 }
 
@@ -47,6 +52,19 @@ function initialMessages(loaded: ThreadMessage[]): ThreadMessage[] {
   if (loaded.length === 0) return [createWelcomeMessage()];
   if (!hasWelcome) return [createWelcomeMessage(), ...loaded];
   return loaded;
+}
+
+function hydrateCachedImages(
+  sessionId: string,
+  msgs: ThreadMessage[],
+): ThreadMessage[] {
+  const cached = readCachedSessionImages(sessionId);
+  if (!Object.keys(cached).length) return msgs;
+  return msgs.map((m) =>
+    m.imageDataUrl || !cached[m.id]
+      ? m
+      : { ...m, imageDataUrl: cached[m.id] },
+  );
 }
 
 export function useChatSession() {
@@ -65,7 +83,7 @@ export function useChatSession() {
       if (user) {
         const id = await createChatSession(
           user.id,
-          firstMessage?.slice(0, 80) || "New check",
+          firstMessage?.slice(0, 80) || "Screenshot check",
         );
         setSessionId(id);
         setLocalSessionId(id);
@@ -87,7 +105,9 @@ export function useChatSession() {
         try {
           const loaded = await loadChatMessages(stored);
           setSessionId(stored);
-          setMessages(initialMessages(loaded));
+          setMessages(
+            hydrateCachedImages(stored, initialMessages(loaded)),
+          );
         } catch {
           setSessionId(null);
           setMessages([createWelcomeMessage()]);
@@ -106,7 +126,7 @@ export function useChatSession() {
       const opts: ChatSendPayload =
         typeof payload === "string" ? { text: payload } : payload;
       const trimmed = opts.text.trim();
-      const hasImage = Boolean(opts.imageBase64);
+      const hasImage = Boolean(opts.imageBase64 && opts.imageDataUrl);
       if ((!trimmed && !hasImage) || loading) return;
 
       const kind: PendingKind = looksLikeLiveCheck(trimmed, hasImage)
@@ -115,11 +135,12 @@ export function useChatSession() {
       setPendingKind(kind);
       setError(null);
 
-      const displayContent =
-        trimmed || (hasImage ? "📷 Screenshot attached" : "");
+      // Image is the message; optional caption sits under it — no emoji placeholder.
+      const displayContent = trimmed;
+      const messageId = newId();
 
       const userMsg: ThreadMessage = {
-        id: newId(),
+        id: messageId,
         role: "user",
         content: displayContent,
         messageType: "text",
@@ -129,7 +150,13 @@ export function useChatSession() {
       setMessages((prev) => [...prev, userMsg]);
 
       try {
-        const sid = await ensureSession(trimmed || "Screenshot");
+        const sid = await ensureSession(
+          trimmed || (hasImage ? "Screenshot" : "New check"),
+        );
+        if (opts.imageDataUrl) {
+          cacheSessionImage(sid, messageId, opts.imageDataUrl);
+        }
+
         const history = toHistory(messages);
         const response = await sendChatMessage({
           text: trimmed,
@@ -159,7 +186,14 @@ export function useChatSession() {
           const persistType =
             response.type === "error" ? "text" : response.type;
           try {
-            await saveChatMessage(sid, "user", displayContent, "text");
+            await saveChatMessage(
+              sid,
+              "user",
+              displayContent,
+              "text",
+              undefined,
+              opts.imageDataUrl,
+            );
             await saveChatMessage(
               response.session_id,
               "assistant",
@@ -176,7 +210,7 @@ export function useChatSession() {
           saveCheck(
             user.id,
             response.verdict.agent,
-            trimmed || displayContent,
+            trimmed || "[Screenshot]",
             response.verdict,
           ).catch(() => undefined);
         }
@@ -192,6 +226,8 @@ export function useChatSession() {
   );
 
   const startNewSession = useCallback(() => {
+    const prev = getLocalSessionId();
+    if (prev) clearCachedSessionImages(prev);
     setSessionId(null);
     localStorage.removeItem("safeline_chat_session_id");
     setMessages([createWelcomeMessage()]);
@@ -208,7 +244,7 @@ export function useChatSession() {
       if (user) {
         try {
           const loaded = await loadChatMessages(id);
-          setMessages(initialMessages(loaded));
+          setMessages(hydrateCachedImages(id, initialMessages(loaded)));
         } catch {
           setMessages([createWelcomeMessage()]);
         }

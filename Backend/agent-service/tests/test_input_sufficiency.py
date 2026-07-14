@@ -60,3 +60,17 @@ def test_content_to_check_keeps_safety_question_off_session_history():
     ]
     question = "Hi how does phishing happen"
     assert _content_to_check(question, history) == question
+
+
+def test_screenshot_ocr_block_counts_as_sufficient():
+    text = (
+        "[Screenshot text]: Dear customer your KYC is pending. "
+        "Click http://bit.ly/x to verify UPI or account will be blocked."
+    )
+    assert not is_insufficient_for_check(text)
+
+
+def test_failed_vision_placeholder_is_insufficient():
+    assert is_insufficient_for_check(
+        "[Screenshot text]: [Image received] (vision extraction failed)"
+    )

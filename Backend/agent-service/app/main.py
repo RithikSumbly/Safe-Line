@@ -76,6 +76,7 @@ async def chat_message(
     session_id = req.session_id or new_session_id()
     text = (req.text or "").strip()
 
+    from_screenshot = False
     if req.image_base64:
         try:
             raw = base64.b64decode(req.image_base64, validate=False)
@@ -84,6 +85,7 @@ async def chat_message(
         if len(raw) > 5_000_000:
             raise HTTPException(status_code=400, detail="Image too large (max 5MB).")
         if len(raw) > 0:
+            from_screenshot = True
             mime = normalize_image_mime(req.image_mime_type)
             extracted = await extract_text_from_screenshot(raw, mime_type=mime)
             image_note = extracted.strip()
@@ -98,7 +100,12 @@ async def chat_message(
         return ChatMessageResponse(
             type="clarification",
             session_id=session_id,
-            assistant_text="Send me the suspicious message you'd like checked — paste text or a screenshot.",
+            assistant_text=(
+                "We received your screenshot but couldn't read any text from it. "
+                "Try a clearer photo, or paste the message text."
+                if from_screenshot
+                else "Send me the suspicious message you'd like checked — paste text or a screenshot."
+            ),
         )
     response = await handle_chat_message(text, req.history, session_id)
     if response.type == "verdict" and response.verdict:

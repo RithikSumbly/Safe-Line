@@ -27,10 +27,11 @@ SafeLine helps users verify suspicious messages, job offers, and crisis rumors b
 
 ## Architecture
 
-- **Frontend:** Vite + React + Supabase Auth/history (Vercel)
-- **Backend:** FastAPI + Gemini agent pipelines (HF Spaces / Docker)
-- **Database:** Supabase Postgres + pgvector
+- **Frontend:** Vite + React 19 + TypeScript + Tailwind v4 + React Router 7 (Vercel)
+- **Backend:** FastAPI + Pydantic + Gemini agent pipelines (HF Spaces / Docker)
+- **Database:** Supabase Postgres + Auth + RLS + pgvector
 - **WhatsApp:** Meta Cloud API webhook → same orchestrator; Vercel relay for text, interactive menus, and media download on HF
+- **Not LangGraph:** `langgraph` is listed in Python requirements but unused; routing is a custom async orchestrator, not a graph runtime
 
 **Orchestrator:** educational safety questions → answer in place; otherwise classify / fast-path agent / LLM tool decision. Short follow-ups may reuse prior pasted content; safety questions never do.
 
@@ -46,7 +47,7 @@ SafeLine helps users verify suspicious messages, job offers, and crisis rumors b
 
 ## Evaluation
 
-Manual scenario checks against live agents (web + WhatsApp). Public fixtures: `tests/eval_cases/`. Fuller local fixtures: `_private/eval/eval_cases/`. Use `tests/eval_cases/` fixtures for demos.
+Manual scenario checks against live agents (web + WhatsApp). Public fixtures: `tests/eval_cases/`. Fuller local fixtures: `_private/eval/eval_cases/`.
 
 ## Security
 

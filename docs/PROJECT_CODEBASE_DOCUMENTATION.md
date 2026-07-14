@@ -88,7 +88,26 @@ Earlier experiments (including a separate Next.js app formerly under `Project 2/
 
 ---
 
-## 3. Technology Stack
+## 3. Technology Stack / Frameworks
+
+### What we actually run on
+
+SafeLine is **not** a LangGraph / LangChain app. The runtime stack is:
+
+| Layer | Framework / platform | Role |
+|-------|----------------------|------|
+| Web UI | **Vite 8 + React 19 + TypeScript** | SPA at `/chat`, dashboard, landing |
+| Styling | **Tailwind CSS v4** + Radix primitives | Newsroom UI tokens |
+| Routing | **React Router 7** | Client routes |
+| Frontend host | **Vercel** | SPA + `api/whatsapp/send.ts` serverless relay |
+| Agent API | **FastAPI + Uvicorn** (Python 3.11) | Orchestrator, agents, WhatsApp webhook |
+| Agent host | **Docker → Hugging Face Spaces** | Production brain |
+| LLM | **Google Gemini** (`google-generativeai`) | Structured JSON + embeddings + vision OCR |
+| Data / Auth | **Supabase** (Postgres, Auth, RLS, **pgvector**) | Users, checks, chat, RAG |
+| Channels | Meta **WhatsApp Cloud API** | Webhook in + interactive menus out |
+| HTTP tools | **httpx** | Safe Browsing, VirusTotal, Tavily, NewsAPI, … |
+
+Validation / config: **Pydantic v2** + `pydantic-settings`. Tests: **pytest** + asyncio.
 
 ### Languages
 
@@ -112,7 +131,7 @@ Earlier experiments (including a separate Next.js app formerly under `Project 2/
 | `@vercel/node` | ^5.5.15 (dev) | Types for serverless WhatsApp relay |
 | `oxlint` | ^1.71.0 | Linting |
 
-**No** Redux, Zustand, TanStack Query, or Next.js in the production frontend.
+**No** Redux, Zustand, TanStack Query, Next.js, or LangChain/LangGraph in the production frontend.
 
 ### Backend (agent-service)
 
@@ -126,7 +145,35 @@ Earlier experiments (including a separate Next.js app formerly under `Project 2/
 | `dnspython` | Local MX record lookups |
 | `pymupdf` | PDF handling (listed in requirements; WhatsApp pipeline rejects PDF uploads at runtime) |
 | `pytest` + `pytest-asyncio` | Tests |
-| `langgraph` | **Listed in requirements but not imported anywhere in app code** |
+| `langgraph` | **Listed in `requirements.txt` but unused — see below** |
+
+### About LangGraph — and how orchestration is done instead
+
+Early Agentic-AI stack planning often defaults to **LangGraph** (typed graph state, nodes for agents/tools, edges for routing). SafeLine **lists** `langgraph>=0.2.0` in `Backend/agent-service/requirements.txt` (and root `requirements.txt`), but **nothing in `app/` imports or runs it.** It is a leftover line item — safe to delete in a cleanup PR; it does not affect runtime.
+
+**What we built instead:** a single async Python entrypoint that *is* the graph, written as plain code.
+
+| LangGraph idea | SafeLine equivalent |
+|----------------|---------------------|
+| Graph entry / channel | `POST /chat/message` → `handle_chat_message()` (`chat/orchestrator.py`) |
+| Classifier node | First Gemini call with `OrchestratorDecision` schema (`next_action` enum) |
+| Tool / agent nodes | `execute_tool()` → `run_scam_agent` / `run_job_offer_agent` / `run_crisis_rumor_agent` / `answer_safety_question` / … |
+| Conditional edges | `if decision.next_action == …` plus early exits in `input_sufficiency.py` |
+| Shared state | Plain locals + `router_messages` list (truncated chat window) + optional Supabase `agent_runs` |
+| Human / interrupt | Not used — request/response; WhatsApp is a second entry that calls the same orchestrator |
+
+**Concrete sequence (happy path — paste a scam SMS):**
+
+1. Frontend / WhatsApp builds a text string (or OCR-prefixed screenshot text — see § Screenshot pipeline below).
+2. `looks_like_safety_question` may short-circuit to RAG (`answer_safety_question`) without opening a tool agent.
+3. Otherwise Gemini returns `OrchestratorDecision` (structured JSON via `llm_client`).
+4. `execute_tool` maps `next_action` → agent function with `content_to_check` (prefer current message over stale history).
+5. Inside the agent: `llm_orchestrate` may request tool calls → `ToolRegistry` runs HTTP tools → results folded into synthesis → `AnnotatedVerdict`.
+6. Orchestrator returns `ChatMessageResponse` (`assistant_text` + optional `verdict`); WhatsApp formats the same verdict into Meta text/buttons.
+
+Why keep it this way: full control over evidence-first order, privacy-safe caption+OCR merge, CSRF on browser routes, Vercel↔HF WhatsApp relay, and Gemini schema flattening — without fighting a graph framework’s lifecycle.
+
+The “agentic” claim for the project is this **explicit multi-agent FastAPI orchestrator**, not LangGraph.
 
 ### Database
 
@@ -871,6 +918,48 @@ Runtime-detected (not in Settings):
 | `whatsapp/classifier.py` | `is_chitchat` greeting detection |
 | `whatsapp/vision.py` | Gemini screenshot OCR (`extract_text_from_screenshot`) |
 
+### Screenshot pipeline (web + WhatsApp) — how images are handled and shown
+
+**Product behavior:** paste or attach a screenshot (with or without caption) → it appears as a **sent bubble** with the image → backend OCR → same orchestrator / agents as text paste.
+
+**Server:** Image bytes are **not** kept after OCR. Gemini vision extracts text once; the agent pipeline runs on:
+
+```
+[Screenshot text]: <OCR…>
+```
+
+(or `caption` + that block). Failed OCR returns a clarification asking for a clearer shot or paste.
+
+**Frontend render + storage:**
+
+| Layer | What happens |
+|-------|----------------|
+| Composer | `fileToChatImage` → resize → `{ dataUrl, base64, mime }` |
+| Sent bubble | `ThreadMessage.imageDataUrl` → `<img>` in `ChatMessage` (image-first bubble; caption optional) |
+| API | `POST /chat/message` with `image_base64` (OCR only on server) |
+| Signed-in history | `chat_messages.image_data_url` column persists the data URL; `loadChatMessages` restores the thumbnail |
+| Guest / soft reload | `sessionStorage` cache (`chatImageCache.ts`) keeps recent screenshots for the session id |
+
+```
+1. Capture
+   ChatComposer: paste or paperclip
+   → fileToChatImage → dataUrl + base64
+
+2. Sent message (UI)
+   useChatSession appends ThreadMessage { imageDataUrl, content: caption or "" }
+   ChatMessage renders the screenshot as the outgoing bubble
+
+3. Check pipeline
+   base64 → Gemini OCR → "[Screenshot text]: …" → handle_chat_message
+   (sufficiency checks use the OCR body, not the label)
+
+4. Persist
+   signed-in: saveChatMessage(..., imageDataUrl)
+   guest: React state + optional sessionStorage cache
+```
+
+WhatsApp: Meta shows the photo in WA; we download → OCR → same text prefix → orchestrator → text reply. No `image_data_url` row for WhatsApp.
+
 ### Backend — data
 
 | File | Role |
@@ -1220,7 +1309,7 @@ Manual application via Supabase SQL editor or CLI — no automated migration run
 ## 26. Known Limitations (inferred from implementation)
 
 1. **Guest API default** — open to abuse of LLM/tool quota unless rate limits / `API_REQUIRE_AUTH` tightened
-2. **`langgraph` dependency unused**
+2. **`langgraph` dependency unused** — still in `requirements.txt` but never imported; orchestration is custom FastAPI/`orchestrator.py`, not LangGraph (see §3)
 3. **PhishTank integration is a no-op stub**
 4. **PDF WhatsApp uploads rejected** despite `pymupdf` in requirements
 5. **Rental/legal agent removed** — private eval still has `rental_redflag.jsonl`
@@ -1269,8 +1358,8 @@ Parallel to the web channel, a WhatsApp integration listens on `/whatsapp/webhoo
 
 Data infrastructure relies on Supabase for authentication (email/password), PostgreSQL storage, and vector search. Migrations in `Frontend/supabase/migrations` evolved from an earlier four-agent design to the current three-agent model. RAG ingestion is offline via `Backend-tooling/scripts/seed_corpus.py`, reading `data/scam_reference_corpus.json`, embedding with Gemini, and inserting into `document_chunks`.
 
-Public eval stubs live in `tests/eval_cases/`; fuller fixtures stay under `_private/eval/`. Live-verified demo paste texts: `tests/eval_cases/ (see also private DEMO_MESSAGES)`. Overall, SafeLine prioritizes **evidence-grounded verdicts with graceful degradation**: missing API keys, empty vector indexes, or LLM failures degrade to heuristics and `unverified` statuses rather than hallucinated certainty.
+Public eval stubs live in `tests/eval_cases/`; fuller fixtures stay under `_private/eval/`. Live-verified demo paste texts: `_private/docs/DEMO_MESSAGES.md`. Overall, SafeLine prioritizes **evidence-grounded verdicts with graceful degradation**: missing API keys, empty vector indexes, or LLM failures degrade to heuristics and `unverified` statuses rather than hallucinated certainty.
 
 ---
 
-*Last synced July 2026 — safety-question routing, pending reply-vs-check UI, web+WhatsApp screenshot OCR, interactive WhatsApp menus, HF↔Vercel relay (`send` / `send_message` / `download_media`). Statements not directly observable in code are marked "could not be confirmed" above.*
+*Last synced July 2026 — safety-question routing, pending reply-vs-check UI, web+WhatsApp screenshot OCR (ephemeral client preview; server OCR-only, no blob store), interactive WhatsApp menus, HF↔Vercel relay (`send` / `send_message` / `download_media`), LangGraph unused / custom orchestrator detail. Statements not directly observable in code are marked "could not be confirmed" above.*
