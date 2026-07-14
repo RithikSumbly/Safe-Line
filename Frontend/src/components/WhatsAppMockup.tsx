@@ -47,6 +47,9 @@ export function WhatsAppMockup({ className }: { className?: string }) {
         >
           tap to open chat
         </a>
+        <span className="block mt-1 text-xs text-ink/45">
+          Forward text or send a screenshot — we read it and check live sources.
+        </span>
       </p>
     </div>
   );

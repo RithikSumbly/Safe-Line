@@ -1,40 +1,45 @@
 # SafeLine — Project Context & Implementation Summary
 
-This document records what was built, in what order, and why — for the Himshikhar Capstone **SafeLine** frontend.
+Internal history of how the **SafeLine** frontend and live stack were built for Himshikhar Capstone 2026.  
+For architecture facts, prefer [`PROJECT_CODEBASE_DOCUMENTATION.md`](PROJECT_CODEBASE_DOCUMENTATION.md).
 
 ---
 
-## What SafeLine is
+## What SafeLine is (current)
 
-**SafeLine** is a trust & safety platform with three AI-powered checkers:
+Evidence-backed trust & safety agent for India: paste or forward suspicious SMS, job offers, or crisis rumors; get a cited verdict via **web chat**, **WhatsApp**, or the **agent API**.
 
-| Checker | Route | Purpose |
-|---------|-------|---------|
-| Scam Message | `/scam` | Phishing SMS, fake bank alerts, suspicious links |
-| Fake Job Offer | `/jobs` | Upfront-fee offers, impersonated recruiting |
-| Crisis Rumor | `/crisis` | Forwarded emergency claims vs official bulletins |
+| Surface | Status |
+|---------|--------|
+| Web SPA | Live — [safe-line-khaki.vercel.app](https://safe-line-khaki.vercel.app) |
+| Agent API | Live — [celestiallord-safe-line.hf.space](https://celestiallord-safe-line.hf.space) |
+| WhatsApp bot | Live — Meta webhook + interactive list/buttons + screenshot OCR; Vercel relay (text / interactive / media) |
+| Unified chat | Primary UX at `/chat` (legacy `/scam`, `/jobs`, `/crisis` redirect with hints) |
+| Screenshots | Live — paste/attach on web; photo on WhatsApp → Vision OCR |
 
-Plus a **WhatsApp bot companion** (UI mockup on landing; backend not built yet).
+Design intent: calm, cited, newsroom feel — not a flashy AI SaaS landing page.
 
-Design intent: calm, cited, fact-checking newsroom feel — not a flashy AI SaaS landing page.
+Pending UI: short replies show **Replying…**; real checks show the source-checking loader (`looksLikeLiveCheck`).
+
+Live-verified paste texts for demos: eval fixtures under `tests/eval_cases/`. Teammate deep dive: codebase docs in this folder.
 
 ---
 
-## Tech stack
+## Tech stack (current)
 
 | Layer | Choice |
 |-------|--------|
 | Framework | Vite + React 19 + TypeScript |
 | Styling | Tailwind CSS v4 + custom design tokens |
-| UI primitives | shadcn-style components (Radix + CVA) |
+| UI primitives | shadcn-style (Radix + CVA) |
 | Routing | React Router v7 |
-| Icons | Lucide (line icons only) |
-| Auth & database | **Supabase** (Auth + Postgres + RLS) |
-| Agent checks | Mock data via `checkContent()` — real backend TBD |
+| Auth & database | Supabase (Auth + Postgres + RLS + pgvector) |
+| Agent checks | Live `POST /agents/{agent}` and `/chat/message` when `VITE_API_BASE_URL` is set; mock fallback only if unset |
+| Deploy | Vercel (SPA + WhatsApp relay), Docker → Hugging Face Spaces (agent) |
 
 ---
 
-## Design system (as specified)
+## Design system
 
 ### Colors
 
@@ -47,147 +52,47 @@ Design intent: calm, cited, fact-checking newsroom feel — not a flashy AI SaaS
 | `pending` | `#B8862B` | Unverified / medium |
 | `line` | `#D8D5CC` | Hairline borders and dividers |
 
-Secondary text uses `ink` at low opacity (`text-ink/60`), not a separate grey palette.
-
 ### Typography
 
-- **Fraunces** — display headings only (hero, section titles)
+- **Fraunces** — display headings
 - **IBM Plex Sans** — body, labels, buttons
 - **IBM Plex Mono** — citations, source tags, confidence, timestamps
 
 ### Layout rules
 
 - Border radius: 10–12px
-- Hairline `border-line` dividers; no drop-shadow cards
-- Numbered steps **only** in the “How it works” section
+- Hairline `border-line` dividers; no drop-shadow cards by default
 - Responsive down to 375px; visible keyboard focus states
 
----
+### Signature component: `AnnotatedVerdictCard`
 
-## Signature component: `AnnotatedVerdictCard`
+Submitted text with colored underlines + superscripts, verdict stamp, sources list, confidence/risk, recommended action, domain disclaimer. Respects `prefers-reduced-motion`.
 
-Every check result is rendered through this component. It shows:
-
-1. Submitted text with colored underlines on flagged phrases (risk / verified / pending) and superscript tags (¹ ² ³)
-2. Rotated circular verdict stamp (e.g. HIGH RISK, VERIFIED SAFE)
-3. Numbered “Sources checked” evidence list with checkmark/X per source
-4. Confidence bar (0–100%) and risk score badge
-5. Recommended action strip
-6. Domain-specific disclaimer
-
-Animations on load: underlines draw left-to-right, stamp rotates in, evidence rows fade in staggered. Respects `prefers-reduced-motion`.
+`HeroLiveDemo` on the landing page keeps a reserved-height typewriter + mounted verdict card (opacity fade) so the hero does not flicker/shift during cycles.
 
 ---
 
-## Implementation timeline
+## Implementation timeline (historical)
 
-### Phase 1 — Greenfield frontend (complete)
+### Phase 1 — Greenfield frontend
 
-Started from an **empty** `Frontend/` directory.
+Empty `Frontend/` → Vite/React/TS, Tailwind tokens, React Router, mock `checkContent()`, landing + three tool pages, about, stub auth.
 
-**Scaffolded:**
+### Stub migration — Firebase → Supabase
 
-- Vite + React + TypeScript
-- Tailwind v4 with custom `@theme` tokens in `src/index.css`
-- React Router for all routes
-- Minimal shadcn-style UI: Button, Input, Textarea, Label, Select, Badge
+Firebase placeholders removed; Supabase client stub, migrations for `checks` / `profiles`, AuthContext placeholder.
 
-**Built:**
+### Phase 2 — Supabase live wiring
 
-- `src/types/agent.ts` — `AgentVerdict`, `AnnotatedVerdict`, `EvidenceItem`, etc.
-- `src/data/mockVerdicts.ts` — realistic mock examples per agent (HDFC KYC scam SMS, fake Amazon job, Mullaperiyar flood forward)
-- `src/lib/checkContent.ts` — single swap point for future backend; ~1.5s mock delay
-- `AnnotatedVerdictCard`, `CheckingSourcesLoader`, layout (Nav, Footer, AppLayout)
-- Landing page: hero demo, how-it-works, checker cards, trust section, WhatsApp mockup
-- Three tool pages with agent-specific inputs
-- `/about` responsible-use page
-- Stub auth/dashboard pages (no live backend yet)
+Connected project **Safe Line** (`fnkxabyvnqkykpnzhxrk`): Auth (email + Google), RLS, check history, dashboard WhatsApp phone link. At this stage `checkContent()` was still mock.
 
-**Deferred initially:** Supabase auth and check history.
+### Phase 3 — Live agents + multi-channel (current)
 
----
-
-### Stub migration — Firebase → Supabase (complete)
-
-User chose **Supabase only** (not Firebase). A quick pass replaced Firebase placeholders:
-
-| Removed | Added |
-|---------|-------|
-| `src/lib/firebase.ts` | `src/lib/supabase.ts` (commented stub) |
-| `firestore.rules` | `supabase/migrations/001_checks.sql` |
-| `VITE_FIREBASE_*` in `.env.example` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
-| Firebase copy on auth pages | “Once Supabase is connected” messaging |
-| — | `src/lib/checks.ts` (no-op stubs) |
-| — | `src/contexts/AuthContext.tsx` (placeholder `user: null`) |
-
-No live wiring at this stage — UI and mock checks unchanged.
-
----
-
-### Phase 2 — Supabase live wiring (complete)
-
-Connected to the **Safe Line** Supabase project:
-
-| Property | Value |
-|----------|-------|
-| Project name | Safe Line |
-| Project ref | `fnkxabyvnqkykpnzhxrk` |
-| URL | `https://fnkxabyvnqkykpnzhxrk.supabase.co` |
-
-#### Dependencies & config
-
-- Installed `@supabase/supabase-js`
-- Activated `src/lib/supabase.ts` with env-based `createClient`
-- Created local `.env` (gitignored) with project URL + anon key
-- Updated `.gitignore` for `.env` / `.env.local`
-
-#### Database (applied via Supabase MCP)
-
-**`checks` table** — stores user check history:
-
-```sql
-id, user_id, agent, input_text, verdict (jsonb), created_at
-```
-
-RLS: users can SELECT and INSERT only their own rows.
-
-**`profiles` table** — dashboard WhatsApp link:
-
-```sql
-id, whatsapp_phone, updated_at
-```
-
-RLS: users manage own profile. Trigger `on_auth_user_created` auto-creates a profile row on signup.
-
-Migration files in repo:
-
-- `supabase/migrations/001_checks.sql`
-- `supabase/migrations/002_profiles.sql`
-
-#### Auth (`src/contexts/AuthContext.tsx`)
-
-- Session listener via `onAuthStateChange`
-- `signInWithEmail`, `signUpWithEmail`, `signInWithGoogle`, `signOut`
-- Wired into `SignInPage` and `SignUpPage` with error handling and redirects
-
-#### Route protection & nav
-
-- `ProtectedRoute` — guests redirected to `/sign-in`
-- `/dashboard` wrapped in `ProtectedRoute`
-- Nav shows Dashboard + Sign out when signed in
-
-#### Check history
-
-- `src/lib/checks.ts` — `saveCheck`, `getUserChecks`, `getProfile`, `updateWhatsAppPhone`
-- `useContentCheck` — after mock verdict, saves to Supabase if user is signed in
-- `RecentChecksStrip` — loads last 5 checks for signed-in users
-- `DashboardPage` — real history table, profile email, WhatsApp phone save
-
-#### Types
-
-- `src/types/database.ts` — generated from Supabase schema
-
-**Still mock:** `checkContent()` returns local mock data. Swap in `fetch('https://<backend>/agents/{agent}', ...)` when the agent API exists.
+- FastAPI agent-service: scam / job_offer / crisis_rumor + chat orchestrator
+- Frontend talks to HF/local API; CSRF header `X-Safeline-Client: web`
+- WhatsApp Meta webhook → same orchestrator; HF → Vercel relay for Graph API TLS
+- Educational safety questions answered without re-checking session history
+- Capstone/public layout: `data/`, `docs/`, `tests/`; local `_private/`, `_archive/`
 
 ---
 
@@ -196,13 +101,12 @@ Migration files in repo:
 | Route | Page | Auth |
 |-------|------|------|
 | `/` | Landing | Public |
-| `/scam` | Scam checker | Public |
-| `/jobs` | Job offer checker | Public |
-| `/crisis` | Crisis rumor checker | Public |
+| `/chat` | Unified agent chat | Public (guest OK) |
+| `/scam`, `/jobs`, `/crisis` | Redirect → `/chat?hint=…` | — |
 | `/about` | Responsible use | Public |
-| `/sign-in` | Sign in | Public (redirects if signed in) |
-| `/sign-up` | Sign up | Public (redirects if signed in) |
-| `/dashboard` | History + profile | **Protected** |
+| `/sign-in`, `/sign-up` | Auth | Public |
+| `/forgot-password`, `/reset-password` | Password recovery | Public |
+| `/dashboard` | History + WhatsApp phone | **Protected** |
 
 ---
 
@@ -210,93 +114,56 @@ Migration files in repo:
 
 ```
 Frontend/
-├── .env                          # Local Supabase keys (gitignored)
-├── .env.example                  # Template for env vars
+├── api/whatsapp/send.ts      # Vercel Meta relay
 ├── supabase/migrations/
-│   ├── 001_checks.sql
-│   └── 002_profiles.sql
 └── src/
-    ├── types/
-    │   ├── agent.ts              # Verdict data contract
-    │   └── database.ts           # Supabase generated types
-    ├── data/mockVerdicts.ts      # Realistic mock examples
     ├── lib/
-    │   ├── supabase.ts           # Supabase client
-    │   ├── checks.ts             # History CRUD
-    │   └── checkContent.ts       # Agent check API (mock)
-    ├── contexts/AuthContext.tsx  # Auth state + methods
-    ├── hooks/useContentCheck.ts  # Tool page check flow
+    │   ├── supabase.ts
+    │   ├── checkContent.ts   # Live agents when VITE_API_BASE_URL set
+    │   ├── chatApi.ts        # /chat/message + CSRF header
+    │   └── checks.ts
     ├── components/
     │   ├── AnnotatedVerdictCard.tsx
-    │   ├── ProtectedRoute.tsx
-    │   ├── RecentChecksStrip.tsx
-    │   └── layout/               # Nav, Footer, AppLayout
-    └── pages/                    # All route pages
+    │   ├── HeroLiveDemo.tsx
+    │   └── layout/
+    └── pages/                # Landing, Chat, Dashboard, auth, About
 ```
 
----
-
-## Data contract
-
-```typescript
-interface AgentVerdict {
-  agent: "scam" | "job_offer" | "crisis_rumor";
-  status: "high_risk" | "medium_risk" | ... ;
-  confidence: number;       // 0–1
-  risk_score: number;       // 0–100
-  red_flags: string[];
-  evidence: EvidenceItem[];
-  explanation: string;
-  recommended_action: string;
-  needs_human_review: boolean;
-  disclaimer: string;
-}
-```
-
-`AnnotatedVerdict` extends this with `input_text` and `flagged_spans` for UI rendering. Only the `AgentVerdict` portion is stored in the `verdict` jsonb column.
+Root [`.env.example`](../.env.example) holds both `VITE_*` and backend secrets template.
 
 ---
 
 ## How to run
 
 ```bash
-# From repo root: copy .env.example → .env and fill keys once
-cd Frontend
-npm install
-npm run dev      # http://localhost:5173
-npm run build    # production build
+cp .env.example .env   # repo root — fill keys
+cd Frontend && npm install && npm run dev   # :5173
+
+cd Backend/agent-service
+# venv + uvicorn, or Docker — see backend-setup.md
 ```
 
-### Supabase dashboard setup (one-time)
-
-1. **Authentication → Providers** — enable Email and Google
-2. **Authentication → URL Configuration** — add `http://localhost:5173` (and production URL when deployed)
-3. Copy keys into the **repo root** [`.env`](../.env) (see [`.env.example`](../.env.example)):
-
-```
-VITE_SUPABASE_URL=https://fnkxabyvnqkykpnzhxrk.supabase.co
-VITE_SUPABASE_ANON_KEY=<your-anon-key>
-VITE_API_BASE_URL=http://localhost:8000
-SUPABASE_SERVICE_ROLE_KEY=<backend-only — never VITE_*>
-```
+Production frontend: `https://safe-line-khaki.vercel.app`  
+Production API: `https://celestiallord-safe-line.hf.space`
 
 ---
 
-## What is not built yet
+## What is still limited (not “missing”)
 
 | Item | Notes |
 |------|-------|
-| Real agent backend | `checkContent` still returns mock data after 1.5s delay |
-| WhatsApp bot service | Landing page has UI mockup only |
-| Email confirmation UX | Sign-up handles “check your email” message; depends on Supabase auth settings |
-| Production deploy | Vercel/Netlify + production redirect URL in Supabase |
+| Guest API quota | Rate-limited; `API_REQUIRE_AUTH` optional tightening |
+| Meta WhatsApp | Test numbers until full Business verification |
+| External API quotas | VirusTotal / NewsAPI may throttle under load |
+| Streaming | No SSE yet — single-response LLM calls |
+| Guest chat persistence | Browser localStorage until sign-in |
 
 ---
 
-## Copy voice (product principle)
+## Copy voice
 
-Plain, calm, specific. No fear tactics or dark patterns. Buttons say exactly what they do (“Check this message”, not “Analyze now”). Real source names cited precisely (Google Safe Browsing, VirusTotal, etc.). Disclaimers on every verdict card.
+Plain, calm, specific. No fear tactics. Buttons say what they do. Real source names. Disclaimers on every verdict.
 
 ---
 
-*Last updated: July 2026 — reflects Phase 1, Supabase stub migration, and Phase 2 live wiring.*
+*Last updated: July 2026 — reflects live Vercel/HF deploy, WhatsApp hardening, and safety-question routing (`55d5907`).*

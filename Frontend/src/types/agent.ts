@@ -148,6 +148,8 @@ export interface ThreadMessage {
   verdict?: AnnotatedVerdict;
   runId?: string | null;
   createdAt: string;
+  /** Local-only preview of a pasted/uploaded screenshot */
+  imageDataUrl?: string;
 }
 
 export interface ChatSession {

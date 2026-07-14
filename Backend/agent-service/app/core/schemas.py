@@ -104,8 +104,11 @@ class ChatHistoryItem(BaseModel):
 
 class ChatMessageRequest(BaseModel):
     session_id: Optional[str] = None
-    text: str
+    text: str = ""
     history: list[ChatHistoryItem] = Field(default_factory=list)
+    # Optional screenshot (paste/upload from web chat) — base64 without data-URL prefix
+    image_base64: Optional[str] = None
+    image_mime_type: Optional[str] = "image/jpeg"
 
 
 class ChatMessageResponse(BaseModel):

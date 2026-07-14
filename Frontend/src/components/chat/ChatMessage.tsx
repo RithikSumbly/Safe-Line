@@ -32,7 +32,7 @@ export function ChatMessage({ message, onOpenReport }: ChatMessageProps) {
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[85%] rounded-[12px] px-4 py-3 font-sans text-sm leading-relaxed",
+          "max-w-[85%] space-y-2 rounded-[12px] px-4 py-3 font-sans text-sm leading-relaxed",
           isUser
             ? "bg-ink text-paper"
             : message.messageType === "help"
@@ -44,7 +44,17 @@ export function ChatMessage({ message, onOpenReport }: ChatMessageProps) {
                   : "border border-line bg-paper text-ink",
         )}
       >
-        {message.content}
+        {message.imageDataUrl && (
+          <img
+            src={message.imageDataUrl}
+            alt="Attached screenshot"
+            className={cn(
+              "max-h-48 max-w-full rounded-md object-contain",
+              isUser ? "ring-1 ring-paper/20" : "border border-line",
+            )}
+          />
+        )}
+        {message.content && <p className="whitespace-pre-wrap">{message.content}</p>}
       </div>
     </div>
   );

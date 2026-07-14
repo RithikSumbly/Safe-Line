@@ -14,6 +14,7 @@ export function ChatPage() {
     sessionId,
     messages,
     loading,
+    pendingKind,
     error,
     sendMessage,
     startNewSession,
@@ -78,6 +79,7 @@ export function ChatPage() {
             <ChatThread
               messages={messages}
               loading={loading}
+              pendingKind={pendingKind}
               onOpenReport={handleOpenReport}
             />
             {error && (
@@ -85,7 +87,11 @@ export function ChatPage() {
                 {error}
               </p>
             )}
-            <ChatComposer onSend={sendMessage} loading={loading} />
+            <ChatComposer
+              onSend={sendMessage}
+              loading={loading}
+              pendingKind={pendingKind}
+            />
           </div>
         </div>
       </div>

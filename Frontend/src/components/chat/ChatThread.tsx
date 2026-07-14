@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { ChatMessage } from "@/components/chat/ChatMessage";
+import { ChatReplyPending } from "@/components/chat/ChatReplyPending";
 import { CheckingSourcesLoader } from "@/components/CheckingSourcesLoader";
 import {
   CHAT_EMPTY_BLURB,
@@ -7,15 +8,22 @@ import {
   WELCOME_MESSAGE_ID,
 } from "@/lib/chatCopy";
 import { cn } from "@/lib/cn";
+import type { PendingKind } from "@/lib/chatIntent";
 import type { ThreadMessage } from "@/types/agent";
 
 interface ChatThreadProps {
   messages: ThreadMessage[];
   loading: boolean;
+  pendingKind?: PendingKind;
   onOpenReport?: (messageId: string) => void;
 }
 
-export function ChatThread({ messages, loading, onOpenReport }: ChatThreadProps) {
+export function ChatThread({
+  messages,
+  loading,
+  pendingKind = "idle",
+  onOpenReport,
+}: ChatThreadProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(messages.length);
 
@@ -78,7 +86,12 @@ export function ChatThread({ messages, loading, onOpenReport }: ChatThreadProps)
                 onOpenReport={onOpenReport}
               />
             ))}
-            {loading && <CheckingSourcesLoader className="max-w-md" />}
+            {loading &&
+              (pendingKind === "check" ? (
+                <CheckingSourcesLoader className="max-w-md" />
+              ) : (
+                <ChatReplyPending />
+              ))}
           </>
         )}
       </div>

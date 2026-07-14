@@ -62,9 +62,9 @@ WhatsApp ──► Meta Graph API webhook ──► Agent Service /whatsapp/*
                 └── Outbound relay: Vercel /api/whatsapp/send (HF Spaces workaround)
 ```
 
-### Co-located secondary application
+### Archived / local-only material
 
-The repository also contains **`Project 2/Scam-Analyzer-main`** — a separate **Next.js 16** application named `safeguard-nexus` with its own Supabase schema (reports, quiz, learn hub, threat-intelligence pipeline). It is **not wired to the Python agent-service** in the code reviewed; it implements its own chat via Vercel AI SDK + Gemini.
+Earlier experiments (including a separate Next.js app formerly under `Project 2/`) live in **`_archive/`** (gitignored local). Full eval fixtures and working notes live under **`_private/`**. Neither ships in the public/capstone submission.
 
 ---
 
@@ -72,18 +72,19 @@ The repository also contains **`Project 2/Scam-Analyzer-main`** — a separate *
 
 | Directory | Purpose |
 |-----------|---------|
-| `Frontend/` | Production web SPA (SafeLine) |
-| `Backend/agent-service/` | Python FastAPI AI agent service |
-| `Backend-tooling/` | RAG corpus files, seed scripts, WhatsApp tests |
-| `Frontend/supabase/migrations/` | SafeLine database schema (10 migrations) |
-| `TESTS/` | Evaluation test cases (JSONL) and sample PDFs |
-| `data/` | Sample CSV (`sample_scam_messages.csv`) |
-| `data.txt` | Large text corpus converted to RAG JSON |
-| `Project 2/Scam-Analyzer-main/` | Separate Next.js app with own migrations and pipeline |
-| `docs/` | Contains `project_report.md` (ignored as documentation source) |
+| `Frontend/` | Production web SPA (Vercel) + WhatsApp relay (`api/whatsapp/`) |
+| `Backend/agent-service/` | FastAPI multi-agent service (Docker / HF Spaces) |
+| `Backend-tooling/scripts/` | Offline RAG seed scripts (not deployed) |
+| `Frontend/supabase/migrations/` | SafeLine schema, RLS, pgvector |
+| `data/` | RAG corpus JSON + sample CSV + corpus builder input |
+| `docs/` | Public project report, brief, setup guides |
+| `tests/eval_cases/` | Public eval stubs (JSONL) |
+| `_private/` | Local-only: full eval, docs drafts, private tests |
+| `_archive/` | Local-only archived apps / old TESTS tree |
+| `scripts/` | Capstone push helpers (local) |
 | `.vercel/` | Vercel project linkage metadata |
 
-**Relationship**: `Frontend` and `Backend/agent-service` share one Supabase project (via env vars). `Backend-tooling` feeds RAG data into that Supabase. `Project 2` is architecturally independent.
+**Relationship**: `Frontend` and `Backend/agent-service` share one Supabase project. `Backend-tooling` seeds RAG into that Supabase from `data/`.
 
 ---
 
@@ -93,9 +94,9 @@ The repository also contains **`Project 2/Scam-Analyzer-main`** — a separate *
 
 | Language | Where | Why |
 |----------|-------|-----|
-| TypeScript | `Frontend/src`, `Frontend/api`, `Project 2` | Type-safe UI and serverless handlers |
+| TypeScript | `Frontend/src`, `Frontend/api` | Type-safe UI and serverless handlers |
 | Python 3.11 | `Backend/agent-service` | AI orchestration, tool integrations, FastAPI |
-| SQL | `Frontend/supabase/migrations`, `Project 2/supabase/migrations` | Schema, RLS, vector search RPC |
+| SQL | `Frontend/supabase/migrations` | Schema, RLS, vector search RPC |
 
 ### Frontend (SafeLine)
 
@@ -137,10 +138,10 @@ The repository also contains **`Project 2/Scam-Analyzer-main`** — a separate *
 
 | Model | Usage |
 |-------|-------|
-| `gemini-2.0-flash` (default, configurable via `GEMINI_MODEL`) | Structured JSON generation for routing, orchestration, agent synthesis, span annotation, WhatsApp vision OCR |
+| Model from `GEMINI_MODEL` (`.env.example`: `gemini-3.1-flash-lite`; config fallback: `gemini-2.0-flash`) | Structured JSON for routing, orchestration, agent synthesis, span annotation, WhatsApp vision OCR |
 | `models/gemini-embedding-001` | RAG embeddings (1536 dimensions) |
 
-Project 2 additionally uses `gemini-3.1-flash-lite-preview` via Vercel AI SDK.
+Gemini structured output: `llm_client._gemini_response_schema()` flattens `anyOf` null-unions so Gemini accepts orchestrator/tool schemas.
 
 ### External APIs (agent-service tools)
 
@@ -300,16 +301,19 @@ FastAPI route handlers in `main.py` and `whatsapp/meta_webhook.py` — no separa
 - **Agent tools** (`chat/agent_tools.py`) — Thin wrappers mapping tool names to agents
 - **WhatsApp pipeline** (`whatsapp/pipeline.py`) — Channel-specific preprocessing and bookkeeping
 
-### Middleware
+### Middleware / security deps
 
-- **CORS** — Configurable origins; credentials disabled when wildcard present
+- **CORS** — `CORS_ORIGINS` plus built-in origins (`localhost:5173`, production Vercel)
+- **`enforce_api_security`** (`app/security/deps.py`) on `/chat/message`, `/agents/*`, `/feedback`: CSRF → optional JWT → rate limit
+- **Browser CSRF** (`security/csrf.py`) — when `API_CSRF_ENABLED`, browser POSTs need allowlisted `Origin` + `X-Safeline-Client: web`; paths under `/whatsapp*` are skipped (Meta server-to-server)
 - **WhatsApp HMAC** — Optional signature verification via `META_APP_SECRET`
 
 ### Authentication / authorization
 
-- **Web API routes have no authentication.** Any client with network access can call `/chat/message`, `/agents/*`, `/feedback`.
-- Supabase service role used server-side for logging; no user JWT validation on backend.
-- WhatsApp webhook: Meta verify token on GET; HMAC on POST when secret configured.
+- **Guest mode by default** (`API_REQUIRE_AUTH=false`). When true, browser/API callers must present a valid Supabase JWT.
+- Optional Supabase JWT resolution buckets rate limits (guest IP vs authenticated user).
+- Supabase service role used server-side for logging and WhatsApp session writes.
+- WhatsApp webhook: Meta verify token on GET; HMAC on POST when secret configured; no browser CSRF.
 
 ### Validation
 
@@ -326,7 +330,7 @@ FastAPI route handlers in `main.py` and `whatsapp/meta_webhook.py` — no separa
 
 ### Rate limiting
 
-**Not implemented** in agent-service.
+Implemented in `app/security/rate_limit.py`: per-IP guest and per-user auth buckets when `API_RATE_LIMIT_ENABLED=true`. Uses Upstash Redis when `UPSTASH_REDIS_*` are set; otherwise in-memory.
 
 ---
 
@@ -480,13 +484,17 @@ Status enums differ by agent:
 ### Memory / conversation
 
 - **Web chat:** Client sends `history` array (last 8 turns in orchestrator LLM path); server is stateless except logging
-- **WhatsApp:** `whatsapp_sessions.chat_history` persisted in Supabase (max 16 turns); in-memory fallback `_MEM` when Supabase unavailable
-- **Project 2:** Separate conversation memory store (Redis-backed patterns in that app)
+- **WhatsApp:** `whatsapp_sessions.chat_history` persisted in Supabase (max 16 turns); in-memory fallback `_MEM` when Supabase unavailable; inbound Meta message IDs deduped to absorb webhook retries
 
 ### Conversation flow (orchestrator)
 
 ```
 User message
+  → educational safety question? (looks_like_safety_question)
+        → answer_safety_question — short explanation, no verdict / no history reuse
+  → _content_to_check(text, history)
+        → reuse prior pasted message only for short follow-ups
+        → never for safety questions or thin non-check meta text
   → off-topic check (regex)
   → classify_intent (commands / keywords / LLM)
   → greeting-only → HELP_TEXT
@@ -494,10 +502,11 @@ User message
   → else LLM OrchestratorDecision
       → reply (help/clarification/out_of_scope/text)
       → call_tool → execute_tool → agent runner
-      → answer_safety_question → educational LLM
 ```
 
 **Fast path:** Skips orchestrator LLM when `_resolve_tool_name` returns a tool (confidence ≥ 0.4 or heuristic URL/scam keywords).
+
+**Why safety Q first:** Short questions like “how does phishing happen” used to pull a previous lottery SMS from session history and re-run a live check. Educational questions now answer in place.
 
 ### Tool calling
 
@@ -510,7 +519,7 @@ Registered tools: `check_scam_message`, `check_job_offer`, `check_crisis_rumor`,
 - Model: `gemini-embedding-001`, 1536 dimensions
 - Storage: `document_chunks` with IVFFlat index
 - Retrieval: Supabase RPC `match_document_chunks`
-- Ingestion: `rag/ingest_corpus.py` reads `Backend-tooling/rag/scam_reference_corpus.json`
+- Ingestion: `rag/ingest_corpus.py` reads `data/scam_reference_corpus.json`
 - **Design:** RAG is optional enrichment; `apply_evidence_floor` does not require vector hits
 - Fallback: Static FTC evidence item when RPC fails and `fallback=True`
 
@@ -524,20 +533,24 @@ Registered tools: `check_scam_message`, `check_job_offer`, `check_crisis_rumor`,
 
 ### Safety mechanisms
 
-1. **Input sufficiency** (`input_sufficiency.py`) — Blocks thin/meta-only messages
-2. **Prompt injection detection** — Flagged in insufficient-input drafts
-3. **Scope guardrails** — Regex off-topic blocking
-4. **PII stripping** (`guardrails.strip_pii`) — Card numbers, OTP patterns
-5. **Evidence floor** — Downgrades overconfident verdicts without evidence
-6. **Status coercion** — Prevents invalid LLM status strings
-7. **Uncertainty bounds** — Re-caps verdicts when input still insufficient after synthesis
-8. **Disclaimers** — Agent-specific; cybercrime.gov.in / 1930 appended for high-risk scam/job; 112 for disaster urgency in crisis
+1. **Educational Q routing** (`looks_like_safety_question`) — Explains scams without treating the question as a message to check
+2. **Input sufficiency** (`input_sufficiency.py`) — Blocks thin/meta-only messages from empty checks
+3. **Prompt injection detection** — Flagged in insufficient-input drafts
+4. **Scope guardrails** — Regex off-topic blocking
+5. **PII stripping** (`guardrails.strip_pii`) — Card numbers, OTP patterns
+6. **Evidence floor** — Downgrades overconfident verdicts without evidence
+7. **Status coercion** — Prevents invalid LLM status strings
+8. **Uncertainty bounds** — Re-caps verdicts when input still insufficient after synthesis
+9. **Disclaimers** — Agent-specific; cybercrime.gov.in / 1930 for high-risk scam/job; 112 for disaster urgency in crisis
+10. **API hardening** — Browser CSRF Origin allowlist, optional JWT, rate limits
 
 ### Evaluation
 
-- `TESTS/test-suite/eval_cases/*.jsonl` — Test cases with `expected_status`
+- Public stubs: `tests/eval_cases/*.jsonl`
+- Full fixtures (local): `_private/eval/eval_cases/` (includes `rental_redflag.jsonl`)
+- Unit tests: `Backend/agent-service/tests/` (input sufficiency, CSRF, WhatsApp webhook, Gemini schema)
 - `eval_runs` table exists for logging eval results
-- **Automated eval runner:** Could not be confirmed as a wired CI job from implementation (no `.github/workflows` found)
+- **Automated eval runner:** Not wired as CI (no `.github/workflows` found)
 
 ---
 
@@ -616,7 +629,6 @@ Registered tools: `check_scam_message`, `check_job_offer`, `check_crisis_rumor`,
 
 - `@lru_cache` on `get_settings()` and `get_supabase()`
 - No HTTP cache headers on agent API
-- Project 2 has `link_checks` cache table (separate app)
 
 ---
 
@@ -647,20 +659,10 @@ Registered tools: `check_scam_message`, `check_job_offer`, `check_crisis_rumor`,
 | `Backend-tooling/pytest.ini` | Pytest configuration |
 | `Backend-tooling/_paths.py` | Import path bootstrap for scripts |
 
-### Project 2
-
-| File | Purpose |
-|------|---------|
-| `Project 2/Scam-Analyzer-main/next.config.ts` | Next.js config |
-| `Project 2/Scam-Analyzer-main/middleware.ts` | Supabase session refresh, `/` → dashboard redirect |
-| `Project 2/Scam-Analyzer-main/eslint.config.mjs` | ESLint |
-| `Project 2/Scam-Analyzer-main/postcss.config.mjs` | PostCSS for Tailwind |
-| `Project 2/Scam-Analyzer-main/components.json` | shadcn component config |
-
 ### Supabase
 
 - SafeLine: `Frontend/supabase/migrations/*.sql`, `fresh_database_setup.sql`
-- Project 2: `Project 2/Scam-Analyzer-main/supabase/migrations/*.sql`, `config.toml`
+- Archived app schemas (if present): `_archive/` only
 
 ---
 
@@ -690,11 +692,16 @@ Registered tools: `check_scam_message`, `check_job_offer`, `check_crisis_rumor`,
 |----------|---------|--------------|-------------------|
 | `LLM_PROVIDER` | `gemini` | LLM | Only `gemini` supported |
 | `GEMINI_API_KEY` | `""` | LLM, RAG, vision | LLM calls fail; warnings logged |
-| `GEMINI_MODEL` | `gemini-2.0-flash` | Generation | — |
+| `GEMINI_MODEL` | `gemini-2.0-flash` | Generation | `.env.example` recommends `gemini-3.1-flash-lite` |
 | `SUPABASE_URL` or `VITE_SUPABASE_URL` | `""` | DB logging, RAG, sessions | Operations skipped with warnings |
 | `SUPABASE_SERVICE_ROLE_KEY` | `""` | DB | `get_supabase()` returns None |
-| `CORS_ORIGINS` | `http://localhost:5173` | Browser access | CORS errors from other origins |
+| `CORS_ORIGINS` | `http://localhost:5173` | Browser access | Merged with `BUILTIN_WEB_ORIGINS` (includes production Vercel) |
 | `PORT` | `8000` | Server bind | — |
+| `API_REQUIRE_AUTH` | `false` | Guest vs JWT-required API | Guests allowed when false |
+| `API_CSRF_ENABLED` | `true` | Browser POST Origin+header check | Disable only for local experiments |
+| `API_RATE_LIMIT_ENABLED` | `true` | Per-hour guest/auth buckets | — |
+| `API_RATE_LIMIT_GUEST_PER_HOUR` | `20` | Guest IP limit | — |
+| `API_RATE_LIMIT_AUTH_PER_HOUR` | `120` | Authenticated user limit | — |
 | `GOOGLE_SAFE_BROWSING_KEY` | `""` | URL checks | Tool returns None |
 | `VIRUSTOTAL_API_KEY` | `""` | URL checks | Tool returns None |
 | `PHISHTANK_API_KEY` | `""` | — | **Unused** (PhishTank stub) |
@@ -707,18 +714,14 @@ Registered tools: `check_scam_message`, `check_job_offer`, `check_crisis_rumor`,
 | `META_APP_SECRET` | `""` | Webhook POST HMAC | Verification skipped if empty |
 | `WHATSAPP_SEND_RELAY_URL` | `""` | HF Spaces outbound | Direct Graph API attempted |
 | `WHATSAPP_RELAY_SECRET` | `""` | Relay auth | — |
-| `UPSTASH_REDIS_URL` | `""` | — | **Defined but unused in app code** |
-| `UPSTASH_REDIS_TOKEN` | `""` | — | **Defined but unused in app code** |
+| `UPSTASH_REDIS_URL` | `""` | Optional distributed rate limit | Falls back to in-memory |
+| `UPSTASH_REDIS_TOKEN` | `""` | Optional distributed rate limit | Falls back to in-memory |
 
 Runtime-detected (not in Settings):
 
 | Variable | Purpose |
 |----------|---------|
 | `SPACE_ID` | Detected HF Spaces environment; triggers curl/urllib/relay fallbacks |
-
-### Project 2 (representative — separate app)
-
-Includes `GOOGLE_API_KEY`, `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`, `UPSTASH_REDIS_REST_*`, `TURNSTILE_*`, `PIPELINE_*`, threat feed keys, etc. See `Project 2/Scam-Analyzer-main/src/lib/env.ts` and pipeline scripts.
 
 ---
 
@@ -727,7 +730,7 @@ Includes `GOOGLE_API_KEY`, `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`
 | Service | Used by | Integration |
 |---------|---------|-------------|
 | **Supabase** | Frontend, Backend | Auth, PostgreSQL, pgvector RPC, RLS |
-| **Google Gemini** | Backend, Project 2 | LLM + embeddings |
+| **Google Gemini** | Backend | LLM + embeddings |
 | **Google Safe Browsing API** | Scam agent | URL threat matches |
 | **VirusTotal API** | Scam agent | Domain reputation |
 | **URLhaus (abuse.ch)** | Scam agent | Malware URL feed (no key) |
@@ -739,11 +742,12 @@ Includes `GOOGLE_API_KEY`, `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`
 | **WHOIS JSON API** | Job agent | Domain registration info |
 | **Meta WhatsApp Cloud API** | WhatsApp channel | Webhook + outbound messages |
 | **Vercel** | Frontend hosting | Static SPA + serverless relay |
-| **Hugging Face Spaces** | Backend hosting (inferred) | Docker deployment; SSL workaround for Meta API |
-| **Cloudflare Turnstile** | Project 2 only | Bot protection on chat/report |
-| **Upstash Redis** | Project 2 only | Rate limiting |
+| **Hugging Face Spaces** | Backend hosting | Docker Space (`celestiallord-safe-line`); Meta TLS via Vercel relay |
+| **Upstash Redis** | Agent rate limiting (optional) | Used when `UPSTASH_REDIS_*` set |
 
-**Not used despite code references:** PhishTank (stub), Upstash in Python backend, LangGraph.
+**Live URLs:** frontend [safe-line-khaki.vercel.app](https://safe-line-khaki.vercel.app); agent API [celestiallord-safe-line.hf.space](https://celestiallord-safe-line.hf.space).
+
+**Not used despite code references:** PhishTank (stub), LangGraph dependency.
 
 ---
 
@@ -753,29 +757,23 @@ Includes `GOOGLE_API_KEY`, `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`
 
 | Path | Purpose |
 |------|---------|
-| `.cursor/` | Cursor IDE config |
-| `.git/` | Git metadata |
+| `.env.example` | Template for frontend + backend env |
 | `.vercel/` | Vercel project linkage |
-| `data.txt` | Source text for RAG corpus conversion |
-| `data/` | Sample CSV data |
+| `data/` | `scam_reference_corpus.json`, sample CSV, corpus builder input |
+| `docs/` | Public documentation |
+| `tests/eval_cases/` | Public eval JSONL stubs |
+| `_private/` | Local-only full eval + internal docs |
+| `_archive/` | Local-only archived apps / old test trees |
 
 ### `Frontend/`
 
 | Path | Purpose |
 |------|---------|
 | `api/whatsapp/` | Vercel serverless WhatsApp relay |
-| `dist/` | Production build output |
-| `public/` | Static assets (favicon, icons) |
-| `src/App.tsx` | Route definitions |
-| `src/main.tsx` | React bootstrap |
-| `src/pages/` | Route page components (11 files) |
-| `src/components/` | UI components (layout, chat, verdict, ui) |
-| `src/contexts/` | React context providers |
-| `src/hooks/` | Custom hooks |
-| `src/lib/` | API clients, Supabase helpers, formatting |
-| `src/types/` | TypeScript types mirroring backend schemas |
-| `src/data/` | Mock/static data |
-| `src/assets/` | Bundled assets |
+| `src/App.tsx` | Routes (`/chat` primary; `/scam|jobs|crisis` redirect) |
+| `src/pages/` | Landing, chat, dashboard, auth, about |
+| `src/components/` | Verdict card, chat, `HeroLiveDemo`, layout |
+| `src/lib/` | `apiFetch` (CSRF header), chat/check APIs, Supabase |
 | `supabase/migrations/` | Incremental SQL migrations |
 
 ### `Backend/agent-service/`
@@ -783,44 +781,32 @@ Includes `GOOGLE_API_KEY`, `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`
 | Path | Purpose |
 |------|---------|
 | `app/main.py` | FastAPI entry, core routes |
-| `app/config.py` | Settings |
+| `app/config.py` | Settings + builtin web origins |
+| `app/security/` | CSRF, JWT auth, rate limit, shared deps |
 | `app/router_agent.py` | Intent classification |
 | `app/agents/` | Scam, job, crisis agents + heuristics + base |
 | `app/chat/` | Orchestrator, tools, scope guardrails |
 | `app/core/` | Schemas, LLM, guardrails, evidence, spans, input checks |
-| `app/tools/` | 15 external integration modules |
-| `app/rag/` | Retriever + offline ingest |
-| `app/whatsapp/` | Meta webhook, pipeline, session, vision, formatter, classifier |
+| `app/tools/` | External evidence integrations |
+| `app/rag/` | Retriever + offline ingest (reads `data/`) |
+| `app/whatsapp/` | Meta webhook (dedup), pipeline, session, vision, formatter, **interactive menus** |
 | `app/db/` | Supabase client, feedback |
-| `tests/` | Python unit tests |
+| `tests/` | Unit tests (CSRF, WhatsApp, input sufficiency, Gemini schema) |
 
 ### `Backend-tooling/`
 
 | Path | Purpose |
 |------|---------|
-| `rag/scam_reference_corpus.json` | Embedded reference documents for RAG |
 | `scripts/seed_corpus.py` | Runs corpus ingest via agent-service modules |
-| `scripts/convert_data_txt_corpus.py` | Converts `data.txt` to corpus JSON |
-| `tests/whatsapp/` | WhatsApp classifier/buffering tests |
+| `scripts/convert_data_txt_corpus.py` | Converts `data/` builder input → corpus JSON |
+| `_paths.py` | Import path bootstrap |
 
-### `TESTS/`
-
-| Path | Purpose |
-|------|---------|
-| `test-suite/eval_cases/` | JSONL eval fixtures per agent type |
-| `test-suite/rental_pdfs/` | PDF samples (legacy rental feature artifacts) |
-
-### `Project 2/Scam-Analyzer-main/`
+### Eval locations
 
 | Path | Purpose |
 |------|---------|
-| `src/app/` | Next.js App Router pages and API routes |
-| `src/components/` | UI components (dashboard, learn, marketing, auth, etc.) |
-| `src/lib/` | Supabase clients, AI pipeline, quiz, link check, rate limit |
-| `scripts/pipeline/` | Threat intel ingest/processing CLI scripts |
-| `content/learn/` | Markdown learn articles |
-| `supabase/migrations/` | Separate 17-migration schema |
-| `public/` | Static images and icons |
+| `tests/eval_cases/` | Public JSONL stubs (scam / job / crisis) |
+| `_private/eval/eval_cases/` | Full local fixtures (incl. rental_redflag) |
 
 ---
 
@@ -830,8 +816,11 @@ Includes `GOOGLE_API_KEY`, `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`
 
 | File | Exports / responsibilities | Depends on | Called by |
 |------|---------------------------|------------|-----------|
-| `main.py` | FastAPI app, `/health`, `/agents/route`, `/chat/message`, `/agents/{agent}`, `/feedback` | agents, orchestrator, db, schemas | Uvicorn |
-| `config.py` | `Settings`, `get_settings()` | pydantic-settings | All modules needing config |
+| `main.py` | FastAPI app, `/health`, `/agents/route`, `/chat/message`, `/agents/{agent}`, `/feedback` | agents, orchestrator, db, schemas, `security.deps` | Uvicorn |
+| `config.py` | `Settings`, `get_settings()`, `BUILTIN_WEB_ORIGINS`, `is_allowed_browser_origin` | pydantic-settings | All modules needing config |
+| `security/csrf.py` | `enforce_browser_csrf` (WhatsApp bypass) | config | `security/deps` |
+| `security/rate_limit.py` | Guest/auth rate buckets (Upstash or memory) | config | `security/deps` |
+| `security/deps.py` | `enforce_api_security` | csrf, auth, rate_limit | Protected routes |
 | `router_agent.py` | `classify_intent()` | llm_client, input_sufficiency | orchestrator, `/agents/route` |
 
 ### Backend — agents
@@ -861,7 +850,7 @@ Includes `GOOGLE_API_KEY`, `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`
 | `core/llm_client.py` | `GeminiClient.structured_json` |
 | `core/guardrails.py` | PII strip, disclaimers, action rewriting |
 | `core/evidence_engine.py` | `apply_evidence_floor`, `risk_score_from_status` |
-| `core/input_sufficiency.py` | Thin-input and injection detection |
+| `core/input_sufficiency.py` | Thin-input, check-request heuristics, `looks_like_safety_question` |
 | `core/status_coercion.py` | LLM status → enum mapping |
 | `core/prompt_guards.py` | System prompt safety prefixes |
 | `core/span_annotator.py` | LLM phrase pick + Python offset locate |
@@ -874,12 +863,13 @@ Includes `GOOGLE_API_KEY`, `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`
 
 | File | Role |
 |------|------|
-| `whatsapp/meta_webhook.py` | Routes, signature verify, media download, background tasks |
-| `whatsapp/pipeline.py` | `handle_inbound` — channel adapter to orchestrator |
+| `whatsapp/meta_webhook.py` | Routes, signature verify, message-id dedup, media download (relay on HF), background tasks; `MetaMessenger.send_text` / `send_interactive` |
+| `whatsapp/pipeline.py` | `handle_inbound` — menu ids, OCR, RESET/HELP, channel adapter to orchestrator; post-verdict buttons |
+| `whatsapp/interactive.py` | List menu + reply-button builders (`check_scam` / `check_job` / `check_crisis` / Reset) |
 | `whatsapp/session.py` | Supabase/in-memory session CRUD |
 | `whatsapp/formatter.py` | WhatsApp-specific text formatting |
 | `whatsapp/classifier.py` | `is_chitchat` greeting detection |
-| `whatsapp/vision.py` | Gemini image OCR |
+| `whatsapp/vision.py` | Gemini screenshot OCR (`extract_text_from_screenshot`) |
 
 ### Backend — data
 
@@ -896,8 +886,9 @@ Includes `GOOGLE_API_KEY`, `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`
 |------|------|
 | `App.tsx` | Routes |
 | `hooks/useChatSession.ts` | Chat state machine |
-| `lib/chatApi.ts` | POST `/chat/message` |
-| `lib/checkContent.ts` | POST `/agents/{agent}` with mock fallback |
+| `lib/chatApi.ts` / `apiFetch` | POST `/chat/message` with `X-Safeline-Client: web` |
+| `lib/checkContent.ts` | POST `/agents/{agent}` when `VITE_API_BASE_URL` set; mock fallback otherwise |
+| `components/HeroLiveDemo.tsx` | Landing typewriter demo; reserved-height overlay avoids layout flicker |
 | `lib/chatSessions.ts` | Supabase chat CRUD + localStorage session ID |
 | `lib/checks.ts` | User check history and profile |
 | `lib/feedbackApi.ts` | POST `/feedback` |
@@ -905,7 +896,10 @@ Includes `GOOGLE_API_KEY`, `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`
 | `components/AnnotatedVerdictCard.tsx` | Primary verdict UI |
 | `components/verdict/VerdictReportPanel.tsx` | Slide-over report + feedback |
 | `contexts/AuthContext.tsx` | Supabase auth wrapper |
-| `api/whatsapp/send.ts` | Vercel relay to Meta API |
+| `api/whatsapp/send.ts` | Vercel relay: `send` (text), `send_message` (interactive), `download_media` |
+| `lib/chatIntent.ts` | `looksLikeLiveCheck` → pending reply vs check UI |
+| `lib/chatImage.ts` | Screenshot resize → base64 for `/chat/message` |
+| `components/chat/ChatReplyPending.tsx` | Lightweight “Replying…” bubble |
 
 ---
 
@@ -913,7 +907,9 @@ Includes `GOOGLE_API_KEY`, `NEXT_PUBLIC_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`
 
 ### SafeLine Agent Service (FastAPI)
 
-Base URL: configured via `VITE_API_BASE_URL` (e.g. `http://localhost:8000`)
+Base URL: `VITE_API_BASE_URL` — local `http://localhost:8000` or production `https://celestiallord-safe-line.hf.space`
+
+**Browser POSTs** (chat/agents/feedback): Origin allowlist + `X-Safeline-Client: web`. **`/whatsapp/*`** skips CSRF (Meta/HMAC + relay secret).
 
 #### `GET /health`
 
@@ -922,22 +918,23 @@ Base URL: configured via `VITE_API_BASE_URL` (e.g. `http://localhost:8000`)
 
 #### `POST /agents/route`
 
-- **Auth:** None
+- **Auth / CSRF / rate limit:** via `enforce_api_security` (guest allowed by default)
 - **Input:** `CheckInput` — `{ text, url?, email?, location?, jurisdiction?, fileName? }`
 - **Output:** `RouterResult` — `{ intent, confidence, clarifying_question? }`
-- **Errors:** `422` if `confidence < 0.6` and clarifying question set (detail = question string)
+- **Errors:** `422` if `confidence < 0.6` and clarifying question set; `403` CSRF/origin; `429` rate limit
 
 #### `POST /chat/message`
 
-- **Auth:** None
+- **Auth / CSRF / rate limit:** via `enforce_api_security`
 - **Input:** `ChatMessageRequest` — `{ session_id?, text, history[] }`
 - **Output:** `ChatMessageResponse` — `{ type, session_id, tool_used?, assistant_text, verdict?, run_id? }`
 - **Side effects:** Logs `agent_runs` when `type === "verdict"`
 - **Empty text:** Returns clarification without calling orchestrator
+- **Educational questions:** Orchestrator routes to `answer_safety_question` (no history re-check)
 
 #### `POST /agents/{agent}`
 
-- **Auth:** None
+- **Auth / CSRF / rate limit:** via `enforce_api_security`
 - **Path param:** `agent` ∈ `scam` | `job_offer` | `crisis_rumor`
 - **Input:** `CheckInput`
 - **Output:** `AgentCheckResponse` — `{ verdict: AnnotatedVerdict, run_id? }`
@@ -945,7 +942,7 @@ Base URL: configured via `VITE_API_BASE_URL` (e.g. `http://localhost:8000`)
 
 #### `POST /feedback`
 
-- **Auth:** None
+- **Auth / CSRF / rate limit:** via `enforce_api_security`
 - **Input:** `{ run_id: string, helpful: boolean }`
 - **Output:** `{ status: "ok" }`
 - **Errors:** `400` if save fails
@@ -961,11 +958,12 @@ Base URL: configured via `VITE_API_BASE_URL` (e.g. `http://localhost:8000`)
 - **Headers:** `X-Hub-Signature-256` (required if `META_APP_SECRET` set)
 - **Input:** Meta webhook JSON payload
 - **Output:** `{ status: "ok" }` (processing async)
+- **Dedup:** In-memory `_processed_message_ids` skips Meta retries for the same `messages[].id`
 - **Errors:** `403` invalid signature
 
 #### `GET /whatsapp/status`
 
-- **Output:** Diagnostic object (credential flags, last webhook/send error, relay config)
+- **Output:** Diagnostic object (credential flags, last webhook/send error, relay config); production expects `ready` + `relay_configured`
 
 #### `GET /whatsapp/probe`
 
@@ -983,19 +981,6 @@ Base URL: configured via `VITE_API_BASE_URL` (e.g. `http://localhost:8000`)
 ### Supabase (client-side, not REST routes defined in repo)
 
 Operations documented in Section 8 — accessed via `@supabase/supabase-js`.
-
-### Project 2 API routes (Next.js)
-
-| Method | Route | Purpose (from code structure) |
-|--------|-------|----------------------------|
-| POST | `/api/chat` | AI chat with streaming, Turnstile, rate limit |
-| POST | `/api/link-check` | URL reputation check |
-| GET/POST | `/api/reports`, `/api/reports/[id]` | Scam reports CRUD |
-| POST | `/api/pipeline/run` | Trigger threat pipeline (secret-gated) |
-| POST | `/api/uploads/chat-image`, `/api/uploads/report-screenshot` | Supabase storage uploads |
-| GET/POST | `/api/quiz/*` | Quiz questions, sessions, attempts, campaign stats |
-| GET | `/api/auth/me` | Current user |
-| GET/POST | `/auth/callback`, `/auth/logout` | Supabase auth routes |
 
 ---
 
@@ -1072,6 +1057,8 @@ Backend/tools/*.py ──HTTP──► External APIs
 
 Combines length checks, substance regex (URLs, money, scam keywords), meta-noise stripping, and injection-without-substance detection.
 
+`looks_like_safety_question()` — educational phrasing (`how/what/why/explain`) without a URL or long scam substance → route to Q&A, not a check. `looks_like_check_request()` no longer treats the substring `phish` inside `phishing` as an automatic check.
+
 ### Scam heuristics (`scam_heuristics.py`)
 
 Pattern tags: prize, bank, parcel, loan fee, creator impersonation, YouTube subscribe scams. Produces `ScamPatternProfile` with pre-built evidence items and status/confidence before LLM.
@@ -1098,9 +1085,11 @@ Base score per status (e.g. high_risk=85) adjusted by `(1-confidence)*15`, clamp
 3. Quality filter rejects generic phrases
 4. Dedupe overlapping spans
 
-### Orchestrator fast path
+### Orchestrator fast path + history selection
 
-`_looks_like_content_to_check` uses length, URL presence, keyword regex. Bypasses LLM orchestrator when combined with router hint confidence thresholds.
+1. Safety questions → `answer_safety_question` immediately.
+2. `_content_to_check` may reuse prior user text for short follow-ups (<40 chars), but **not** for safety questions or thin non-check text.
+3. `_looks_like_content_to_check` uses length, URL presence, keyword regex; combined with router confidence ≥ 0.4 bypasses the orchestrator LLM.
 
 ### WhatsApp phone normalization
 
@@ -1148,21 +1137,22 @@ Strip non-digits; prepend `91` for 10-digit Indian numbers.
 ### Implemented
 
 - Supabase RLS on user tables
-- WhatsApp webhook HMAC (`META_APP_SECRET`)
-- Relay secret on Vercel WhatsApp function
+- Optional Supabase JWT on agent API (`API_REQUIRE_AUTH`; guest mode default)
+- Browser CSRF: Origin allowlist (`BUILTIN_WEB_ORIGINS` + `CORS_ORIGINS` + Vercel preview pattern) + `X-Safeline-Client: web`
+- Explicit CSRF bypass for `/whatsapp*` (Meta HMAC / relay auth instead)
+- Per-IP / per-user rate limiting (Upstash or in-memory)
+- WhatsApp webhook HMAC (`META_APP_SECRET`) + inbound message-id dedup
+- Relay secret on Vercel WhatsApp function (`X-Relay-Secret`)
 - PII redaction in verdicts
 - Prompt injection detection (analysis ignored, flagged)
-- Off-topic scope blocking
-- CORS origin allowlist
+- Off-topic scope blocking + educational-question routing (no silent history re-check)
 - Service role key server-side only (not in frontend bundle)
 
-### Not implemented (in SafeLine stack)
+### Not implemented / gaps
 
-- API authentication on agent endpoints
-- Rate limiting on agent service
-- CSRF tokens (stateless API)
-- Content Security Policy headers in code (could not be confirmed from frontend source alone)
-- Turnstile/bot protection (Project 2 only)
+- Content Security Policy headers in frontend source (not confirmed)
+- Turnstile / bot protection on the public web chat
+- Full Meta Business verification for WhatsApp beyond test numbers
 
 ### Secret handling
 
@@ -1217,10 +1207,9 @@ docker run -p 8000:8000 --env-file .env safeline-agent
 
 ### Environment separation
 
-Could not be confirmed from CI config. Inferred from code:
-
-- Local: `localhost:5173` CORS default, optional mock API
-- Production: Vercel frontend, HF Spaces backend URL hardcoded in WhatsApp status endpoint comment
+- Local: `localhost:5173` + `VITE_API_BASE_URL=http://localhost:8000`
+- Production: Vercel SPA + relay at `https://safe-line-khaki.vercel.app`; agent on HF Spaces `https://celestiallord-safe-line.hf.space`
+- Capstone submission repo prepared via `scripts/prepare-capstone-push.sh` (strips HF README frontmatter, excludes `_private/` / `_archive/`)
 
 ### Database migrations
 
@@ -1230,21 +1219,19 @@ Manual application via Supabase SQL editor or CLI — no automated migration run
 
 ## 26. Known Limitations (inferred from implementation)
 
-1. **Agent API is unauthenticated** — any caller can consume LLM/tool quota
-2. **No rate limiting** on Python backend
-3. **`langgraph` dependency unused**
-4. **`PHISHTANK_API_KEY` and `upstash_redis_*` configured but unused** in agent-service
-5. **PhishTank integration is a no-op stub**
-6. **PDF WhatsApp uploads rejected** despite `pymupdf` in requirements
-7. **Rental/legal agent removed** — eval PDFs and seed script references remain as artifacts
-8. **`ingest_legal_corpus()` always returns 0**
-9. **Live ledger ticker uses static mock data**, not Supabase
-10. **Legacy tool pages exist but routes redirect to `/chat`**
-11. **Guest chat sessions** not persisted to Supabase (localStorage ID only)
-12. **Gemini required** — no fallback LLM provider despite `LLM_PROVIDER` setting
-13. **Two separate apps** in one repo with different schemas may cause confusion
-14. **No CI/CD workflows** found in repository
-15. **Project 2 chat** is a separate AI implementation, not the Python agent pipeline
+1. **Guest API default** — open to abuse of LLM/tool quota unless rate limits / `API_REQUIRE_AUTH` tightened
+2. **`langgraph` dependency unused**
+3. **PhishTank integration is a no-op stub**
+4. **PDF WhatsApp uploads rejected** despite `pymupdf` in requirements
+5. **Rental/legal agent removed** — private eval still has `rental_redflag.jsonl`
+6. **`ingest_legal_corpus()` always returns 0**
+7. **Live ledger ticker uses static mock data**, not Supabase
+8. **Legacy tool pages** redirect to `/chat?hint=…`
+9. **Guest chat sessions** not persisted to Supabase (localStorage ID only)
+10. **Gemini required** — no fallback LLM provider despite `LLM_PROVIDER` setting
+11. **No CI/CD workflows** found in repository
+12. **In-memory WhatsApp message-id dedup** resets on process restart (acceptable for Meta short retries)
+13. **Meta Business verification** still required for production WhatsApp reach beyond test numbers
 
 ---
 
@@ -1262,7 +1249,7 @@ Manual application via Supabase SQL editor or CLI — no automated migration run
 | Frontend auth providers | `AuthContext.tsx` | Add Supabase OAuth methods |
 | Status coercion aliases | `status_coercion._ALIASES` | Dict per agent |
 | Heuristic patterns | `scam_heuristics.py`, `crisis_heuristics.py` | Regex + profile dataclass |
-| Project 2 pipeline feeds | `scripts/pipeline/*.ts`, env-gated ingest | Script + env flags |
+| Persistent webhook dedup | `meta_webhook.py` | Replace in-memory set with Redis/DB |
 
 ---
 
@@ -1270,7 +1257,7 @@ Manual application via Supabase SQL editor or CLI — no automated migration run
 
 SafeLine is a capstone-grade trust-and-safety product aimed at Indian users who receive suspicious digital communications. The production user journey centers on a Vite-powered React single-page application deployed on Vercel. Users land on a marketing homepage, navigate to a unified chat interface at `/chat`, and paste suspicious SMS text, job offer emails, or forwarded disaster rumors. The browser sends the message — along with optional conversation history — to a Python FastAPI service that hosts the actual intelligence.
 
-That backend service exposes a small REST surface. The primary endpoint for the web UI is `POST /chat/message`, which feeds into a conversational orchestrator. The orchestrator first rejects obviously off-topic requests using regular expressions, then classifies intent through a layered router: explicit commands (`SCAM`, `JOB`, `CRISIS`), keyword heuristics, or a Gemini structured-classification call. When the user's message contains enough substantive content, the system takes a fast path directly into one of three specialized agent functions without waiting for a second LLM planning step. Otherwise, a Gemini orchestrator model decides whether to invoke a checking tool, answer a general safety question, or reply with help text.
+That backend service exposes a small REST surface hardened with browser CSRF, optional JWT auth, and rate limits (guest mode on by default). The primary endpoint for the web UI is `POST /chat/message`, which feeds into a conversational orchestrator. Educational safety questions (“how does phishing happen”) are answered first via `answer_safety_question` so short Q&A never reuses an older pasted message from session history. Otherwise the orchestrator resolves check content (`_content_to_check`), rejects obviously off-topic requests, then classifies intent through a layered router: explicit commands (`SCAM`, `JOB`, `CRISIS`), keyword heuristics, or a Gemini structured-classification call. When the user's message contains enough substantive content, the system takes a fast path into one of three specialized agents; otherwise a Gemini orchestrator decides whether to invoke a checking tool or reply with help/clarification.
 
 Each agent implements the same philosophical pattern: **gather live evidence first, then synthesize a verdict with an LLM grounded in that evidence, then apply deterministic safety post-processing.** The scam agent extracts URLs and runs them against Google Safe Browsing, VirusTotal, and URLhaus in parallel. It matches message patterns against an extensive heuristic library covering prize scams, bank KYC phishing, parcel fees, loan disbursal traps, and creator impersonation. It optionally retrieves similar advisory text from a pgvector index populated from a JSON corpus. The job agent inspects email domains for free-mail usage, MX records, WHOIS data, and searches news and web sources for registration-fee scam patterns. The crisis agent extracts structured claims, geocodes locations to detect mislocalized rumors, and queries fact-check APIs, news, GDELT, and Indian government site search concurrently.
 
@@ -1278,14 +1265,12 @@ Every agent uses Gemini twice when possible: once to extract structured signals 
 
 The frontend renders the resulting `AnnotatedVerdict` as an interactive card with risk gauge, superscript-linked red flags, evidence source list, and a slide-over report panel. Authenticated users persist checks and chat history in Supabase under row-level security policies. When a verdict is produced on the web, the backend logs an `agent_run` row and associated `evidence_log` entries using a service-role Supabase client, returning a `run_id` the UI can attach feedback to.
 
-Parallel to the web channel, a WhatsApp integration listens on `/whatsapp/webhook` for Meta Cloud API events. Incoming text, images (processed through Gemini vision OCR), and interactive list/button replies enter the same orchestrator. Outbound replies are formatted for WhatsApp's text constraints and sent via the Graph API, with special transport fallbacks for Hugging Face Spaces deployments that cannot reach Facebook directly — those deployments relay through a Vercel serverless function in the frontend project that holds Meta credentials and validates a shared secret header. WhatsApp conversation state lives in a `whatsapp_sessions` table; users who link their phone number on the web dashboard can have WhatsApp verdicts mirrored into their `checks` history.
+Parallel to the web channel, a WhatsApp integration listens on `/whatsapp/webhook` for Meta Cloud API events (CSRF-exempt; HMAC-verified). Incoming text, images (Gemini vision OCR), and interactive list/button replies are handled in `pipeline.handle_inbound`: greetings and `MENU`/`HELP` send HELP text plus a selectable **Choose** list (scam / job / crisis / how it works / reset); check-row taps prompt the user to paste or send a screenshot; Reset clears history so a new paste is not mixed with old messages. Content checks still call the same `handle_chat_message` orchestrator, then format a WhatsApp verdict and optionally attach **Open menu** / **Reset chat** reply buttons. Meta retries are absorbed via inbound message-id deduplication. Outbound text, interactive menus, and media downloads go through a Vercel serverless relay (`Frontend/api/whatsapp/send.ts`) when the agent runs on Hugging Face Spaces. WhatsApp conversation state lives in `whatsapp_sessions`; users who link their phone on the dashboard can have WhatsApp verdicts mirrored into `checks`.
 
-Data infrastructure relies on Supabase for authentication (email/password), PostgreSQL storage, and vector search. Migrations in `Frontend/supabase/migrations` evolved the schema from an earlier four-agent design to the current three-agent model by removing rental-agent constraints and orphaned legal tables. RAG ingestion is an offline operation run from `Backend-tooling/scripts/seed_corpus.py`, embedding chunks with Gemini and inserting into `document_chunks`.
+Data infrastructure relies on Supabase for authentication (email/password), PostgreSQL storage, and vector search. Migrations in `Frontend/supabase/migrations` evolved from an earlier four-agent design to the current three-agent model. RAG ingestion is offline via `Backend-tooling/scripts/seed_corpus.py`, reading `data/scam_reference_corpus.json`, embedding with Gemini, and inserting into `document_chunks`.
 
-The repository also contains a second, larger Next.js application under `Project 2/Scam-Analyzer-main` that implements a broader "Safeguard Nexus" platform with community reports, quizzes, a learn hub, link checking, and an automated threat-intelligence pipeline ingesting RSS, Reddit, and security feeds into its own Supabase schema. That application uses the Vercel AI SDK with a different Gemini model and does not call the Python agent-service in the code paths reviewed. It represents either a prior iteration or a parallel product surface within the same monorepo.
-
-Testing assets under `TESTS/test-suite/eval_cases` provide JSONL fixtures with expected verdict statuses for regression evaluation, though no automated CI job in the repository was found to execute them on every commit. Overall, SafeLine's architecture prioritizes **evidence-grounded verdicts with graceful degradation**: missing API keys, empty vector indexes, or LLM failures degrade to heuristics and `unverified` statuses rather than hallucinated certainty — a deliberate design visible throughout the agent base layer, evidence engine, prompt guards, and input sufficiency modules.
+Public eval stubs live in `tests/eval_cases/`; fuller fixtures stay under `_private/eval/`. Live-verified demo paste texts: `tests/eval_cases/ (see also private DEMO_MESSAGES)`. Overall, SafeLine prioritizes **evidence-grounded verdicts with graceful degradation**: missing API keys, empty vector indexes, or LLM failures degrade to heuristics and `unverified` statuses rather than hallucinated certainty.
 
 ---
 
-*Document generated from repository source analysis. Statements not directly observable in code are marked "could not be confirmed" above.*
+*Last synced July 2026 — safety-question routing, pending reply-vs-check UI, web+WhatsApp screenshot OCR, interactive WhatsApp menus, HF↔Vercel relay (`send` / `send_message` / `download_media`). Statements not directly observable in code are marked "could not be confirmed" above.*

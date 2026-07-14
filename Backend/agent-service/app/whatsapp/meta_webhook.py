@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import hmac
 import json
@@ -152,16 +153,29 @@ async def _try_transports(
 
 
 async def _post_via_relay(payload: dict[str, Any]) -> tuple[int, str, str]:
+    """Relay any Graph outbound message (text or interactive) through Vercel."""
     settings = get_settings()
     relay_url = settings.whatsapp_send_relay_url
     relay_secret = settings.whatsapp_relay_secret
     if not relay_url or not relay_secret:
         raise RuntimeError("WhatsApp relay is not configured")
 
-    relay_body = {
-        "to": payload["to"],
-        "body": payload["text"]["body"],
-    }
+    msg_type = payload.get("type")
+    if msg_type == "text" and isinstance(payload.get("text"), dict):
+        relay_body: dict[str, Any] = {
+            "action": "send",
+            "to": payload["to"],
+            "body": payload["text"].get("body", ""),
+        }
+    else:
+        relay_body = {
+            "action": "send_message",
+            "to": payload["to"],
+            "message": {
+                k: v for k, v in payload.items() if k not in {"messaging_product", "to"}
+            },
+        }
+
     async with httpx.AsyncClient(timeout=_RELAY_TIMEOUT) as client:
         res = await client.post(
             relay_url,
@@ -172,6 +186,49 @@ async def _post_via_relay(payload: dict[str, Any]) -> tuple[int, str, str]:
             json=relay_body,
         )
     return res.status_code, res.text, "vercel-relay"
+
+
+async def _download_media_via_relay(media_id: str) -> tuple[bytes, str]:
+    settings = get_settings()
+    relay_url = settings.whatsapp_send_relay_url
+    relay_secret = settings.whatsapp_relay_secret
+    if not relay_url or not relay_secret:
+        raise RuntimeError("WhatsApp relay is not configured")
+
+    async with httpx.AsyncClient(timeout=_RELAY_TIMEOUT) as client:
+        res = await client.post(
+            relay_url,
+            headers={
+                "Content-Type": "application/json",
+                "X-Relay-Secret": relay_secret,
+            },
+            json={"action": "download_media", "media_id": media_id},
+        )
+    if res.status_code >= 400:
+        raise RuntimeError(f"Media relay failed ({res.status_code}): {res.text[:200]}")
+    data = res.json()
+    raw = base64.b64decode(data["data_base64"])
+    mime = data.get("mime_type") or "image/jpeg"
+    return raw, mime
+
+
+async def _download_media_direct(media_id: str) -> tuple[bytes, str]:
+    settings = get_settings()
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        meta = await client.get(
+            f"https://graph.facebook.com/v21.0/{media_id}",
+            headers={"Authorization": f"Bearer {settings.meta_whatsapp_token}"},
+        )
+        meta.raise_for_status()
+        meta_json = meta.json()
+        url = meta_json["url"]
+        mime = meta_json.get("mime_type") or "image/jpeg"
+        file_res = await client.get(
+            url,
+            headers={"Authorization": f"Bearer {settings.meta_whatsapp_token}"},
+        )
+        file_res.raise_for_status()
+        return file_res.content, mime
 
 
 async def _post_graph_api(
@@ -233,24 +290,39 @@ def _verify_signature(payload: bytes, signature: str | None) -> bool:
 
 class MetaMessenger(Messenger):
     async def send_text(self, to: str, body: str) -> None:
+        await self._send_graph_payload(
+            {
+                "messaging_product": "whatsapp",
+                "to": to,
+                "type": "text",
+                "text": {"body": body},
+            },
+            log_chars=len(body),
+        )
+
+    async def send_interactive(self, to: str, interactive: dict[str, Any]) -> None:
+        await self._send_graph_payload(
+            {
+                "messaging_product": "whatsapp",
+                "to": to,
+                "type": "interactive",
+                "interactive": interactive,
+            },
+            log_chars=len(str(interactive.get("type", "interactive"))),
+        )
+
+    async def _send_graph_payload(self, payload: dict[str, Any], *, log_chars: int) -> None:
         global _last_send_error
         settings = get_settings()
         if not settings.meta_whatsapp_token or not settings.meta_phone_number_id:
             _last_send_error = "credentials missing"
             logger.warning(
-                "WhatsApp credentials not configured — would send to %s: %s",
-                to,
-                body[:80],
+                "WhatsApp credentials not configured — would send to %s",
+                payload.get("to"),
             )
             return
 
         url = f"https://graph.facebook.com/v21.0/{settings.meta_phone_number_id}/messages"
-        payload = {
-            "messaging_product": "whatsapp",
-            "to": to,
-            "type": "text",
-            "text": {"body": body},
-        }
         headers = {"Authorization": f"Bearer {settings.meta_whatsapp_token}"}
 
         last_error = ""
@@ -272,9 +344,10 @@ class MetaMessenger(Messenger):
                     raise RuntimeError(last_error)
                 _last_send_error = None
                 logger.info(
-                    "WhatsApp sent reply to %s (%d chars via %s)",
-                    to[-4:],
-                    len(body),
+                    "WhatsApp sent %s to %s (%d via %s)",
+                    payload.get("type"),
+                    str(payload.get("to", ""))[-4:],
+                    log_chars,
                     transport,
                 )
                 return
@@ -284,7 +357,7 @@ class MetaMessenger(Messenger):
                 logger.warning(
                     "WhatsApp send attempt %d/3 failed for %s: %s",
                     attempt + 1,
-                    to[-4:],
+                    str(payload.get("to", ""))[-4:],
                     last_error,
                 )
                 if attempt < 2:
@@ -297,7 +370,7 @@ class MetaMessenger(Messenger):
                 logger.warning(
                     "WhatsApp send attempt %d/3 failed for %s: %s",
                     attempt + 1,
-                    to[-4:],
+                    str(payload.get("to", ""))[-4:],
                     last_error,
                 )
                 if attempt < 2:
@@ -344,24 +417,27 @@ async def _send_whatsapp_text(to: str, body: str) -> None:
         )
 
 
-async def _download_media(media_id: str) -> bytes:
+async def _download_media(media_id: str) -> tuple[bytes, str]:
+    """Fetch inbound WhatsApp media; use Vercel relay on HF Spaces for TLS."""
     settings = get_settings()
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        meta = await client.get(
-            f"https://graph.facebook.com/v21.0/{media_id}",
-            headers={"Authorization": f"Bearer {settings.meta_whatsapp_token}"},
-        )
-        meta.raise_for_status()
-        url = meta.json()["url"]
-        file_res = await client.get(
-            url,
-            headers={"Authorization": f"Bearer {settings.meta_whatsapp_token}"},
-        )
-        file_res.raise_for_status()
-        return file_res.content
+    if (
+        _running_on_hf()
+        and settings.whatsapp_send_relay_url
+        and settings.whatsapp_relay_secret
+    ):
+        return await _download_media_via_relay(media_id)
+    return await _download_media_direct(media_id)
 
 
-async def _process_message(phone: str, message_id: str, *, text: str = "", image_bytes: bytes | None = None, pdf_bytes: bytes | None = None) -> None:
+async def _process_message(
+    phone: str,
+    message_id: str,
+    *,
+    text: str = "",
+    image_bytes: bytes | None = None,
+    image_mime_type: str | None = None,
+    pdf_bytes: bytes | None = None,
+) -> None:
     messenger = MetaMessenger()
     try:
         await handle_inbound(
@@ -370,6 +446,7 @@ async def _process_message(phone: str, message_id: str, *, text: str = "", image
                 message_id=message_id,
                 text=text,
                 image_bytes=image_bytes,
+                image_mime_type=image_mime_type,
                 document_bytes=pdf_bytes,
             ),
             messenger,
@@ -391,6 +468,7 @@ def _spawn_message_task(
     *,
     text: str = "",
     image_bytes: bytes | None = None,
+    image_mime_type: str | None = None,
     pdf_bytes: bytes | None = None,
 ) -> None:
     task = asyncio.create_task(
@@ -399,11 +477,13 @@ def _spawn_message_task(
             message_id,
             text=text,
             image_bytes=image_bytes,
+            image_mime_type=image_mime_type,
             pdf_bytes=pdf_bytes,
         )
     )
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
+
 
 
 def _extract_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -568,6 +648,7 @@ async def receive_webhook(request: Request):
         text = ""
         pdf_bytes = None
         image_bytes = None
+        image_mime_type = None
 
         if msg_type == "text":
             text = msg.get("text", {}).get("body", "")
@@ -575,26 +656,38 @@ async def receive_webhook(request: Request):
             interactive = msg.get("interactive", {}) or {}
             i_type = interactive.get("type")
             if i_type == "list_reply":
-                text = (interactive.get("list_reply", {}) or {}).get("id", "")
+                reply = interactive.get("list_reply", {}) or {}
+                text = reply.get("id") or reply.get("title") or ""
             elif i_type == "button_reply":
-                text = (interactive.get("button_reply", {}) or {}).get("id", "")
+                reply = interactive.get("button_reply", {}) or {}
+                text = reply.get("id") or reply.get("title") or ""
         elif msg_type == "document":
             doc = msg.get("document", {})
             text = doc.get("caption") or doc.get("filename", "Rental document")
             media_id = doc.get("id")
             if media_id:
                 try:
-                    pdf_bytes = await _download_media(media_id)
+                    pdf_bytes, _pdf_mime = await _download_media(media_id)
                 except Exception as exc:
                     logger.error("Media download failed: %s", exc)
         elif msg_type == "image":
             img = msg.get("image", {}) or {}
             media_id = img.get("id")
+            image_mime_type = img.get("mime_type") or None
             if media_id:
                 try:
-                    image_bytes = await _download_media(media_id)
+                    image_bytes, downloaded_mime = await _download_media(media_id)
+                    image_mime_type = downloaded_mime or image_mime_type
                 except Exception as exc:
                     logger.error("Image download failed: %s", exc)
+                    try:
+                        await MetaMessenger().send_text(
+                            phone,
+                            "I received your photo but couldn't download it. "
+                            "Please try again or paste the message text.",
+                        )
+                    except Exception:
+                        pass
             text = img.get("caption") or ""
 
         if phone and (text or pdf_bytes or image_bytes):
@@ -611,6 +704,7 @@ async def receive_webhook(request: Request):
                 message_id,
                 text=text,
                 image_bytes=image_bytes,
+                image_mime_type=image_mime_type,
                 pdf_bytes=pdf_bytes,
             )
 

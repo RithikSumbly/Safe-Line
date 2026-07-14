@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import logging
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
@@ -26,6 +27,7 @@ from app.router_agent import classify_intent
 from app.security.auth import ApiCaller
 from app.security.deps import enforce_api_security
 from app.whatsapp.meta_webhook import router as whatsapp_router
+from app.whatsapp.vision import extract_text_from_screenshot, normalize_image_mime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -72,19 +74,39 @@ async def chat_message(
     caller: ApiCaller = Depends(enforce_api_security),
 ):
     session_id = req.session_id or new_session_id()
-    if not req.text.strip():
+    text = (req.text or "").strip()
+
+    if req.image_base64:
+        try:
+            raw = base64.b64decode(req.image_base64, validate=False)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid image_base64.")
+        if len(raw) > 5_000_000:
+            raise HTTPException(status_code=400, detail="Image too large (max 5MB).")
+        if len(raw) > 0:
+            mime = normalize_image_mime(req.image_mime_type)
+            extracted = await extract_text_from_screenshot(raw, mime_type=mime)
+            image_note = extracted.strip()
+            if image_note:
+                text = (
+                    f"{text}\n\n[Screenshot text]: {image_note}".strip()
+                    if text
+                    else f"[Screenshot text]: {image_note}"
+                )
+
+    if not text:
         return ChatMessageResponse(
             type="clarification",
             session_id=session_id,
-            assistant_text="Send me the suspicious message you'd like checked.",
+            assistant_text="Send me the suspicious message you'd like checked — paste text or a screenshot.",
         )
-    response = await handle_chat_message(req.text, req.history, session_id)
+    response = await handle_chat_message(text, req.history, session_id)
     if response.type == "verdict" and response.verdict:
         timer = Timer()
         run_id = await log_agent_run(
             agent=response.verdict.agent,
             channel="web",
-            input_text=req.text,
+            input_text=text,
             verdict=response.verdict,
             user_id=caller.user_id,
             latency_ms=timer.elapsed_ms,

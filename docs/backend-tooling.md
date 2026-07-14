@@ -12,8 +12,9 @@ Backend-tooling/
 
 Reference data lives in [`../data/`](../data/):
 
-- `data.txt` — corpus builder source (regenerates JSON)
+- Corpus builder input (regenerates JSON)
 - `scam_reference_corpus.json` — embedded into pgvector via seed script
+- `sample_scam_messages.csv` — supplementary labeled examples
 
 ## Scripts
 
@@ -24,8 +25,9 @@ cd Backend-tooling
 PYTHONPATH=".:../Backend/agent-service" python scripts/seed_corpus.py
 ```
 
-This runs `convert_data_txt_corpus.py` when `data/data.txt` exists, then ingests `data/scam_reference_corpus.json`.
+This regenerates the corpus JSON from builder input when present, then ingests `data/scam_reference_corpus.json` via `app/rag/ingest_corpus.py`.
 
 ## Tests
 
-WhatsApp buffering/classifier tests were moved to `_private/tests/backend-tooling/` (local dev only, not part of submission).
+- Agent-service unit tests: `Backend/agent-service/tests/` (CSRF, WhatsApp webhook, input sufficiency, Gemini schema)
+- Older tooling/WhatsApp experiments may exist under `_private/tests/` (local only)

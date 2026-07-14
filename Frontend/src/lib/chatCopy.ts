@@ -8,8 +8,8 @@ export const HELP_TEXT =
   "Worried about a message you received? Maybe a fake bank alert, a job offer " +
   "that seems too good to be true, or a rumour about a dam breaking nearby. " +
   "We're here to help.\n\n" +
-  "Just paste or forward what you got. We'll verify it against live sources " +
-  "and send you a clear verdict.";
+  "Paste or forward the text, or send a screenshot/photo. We'll read it, " +
+  "verify it against live sources, and send you a clear verdict.";
 
 export function createWelcomeMessage(): ThreadMessage {
   return {
@@ -22,10 +22,10 @@ export function createWelcomeMessage(): ThreadMessage {
 }
 
 export const CHAT_TAGLINE =
-  "Worried about a message you received? Paste it here and we'll verify it against live sources.";
+  "Paste a suspicious message or screenshot — we'll verify it against live sources.";
 
 export const CHAT_EMPTY_TITLE = "Paste anything suspicious";
 
 export const CHAT_EMPTY_BLURB =
-  "Forward a suspicious SMS, job offer, or rumor.\n" +
+  "Forward a suspicious SMS, job offer, rumor, or screenshot.\n" +
   "We check it against live sources and send you a cited verdict.";

@@ -9,11 +9,19 @@ import {
   setLocalSessionId,
 } from "@/lib/chatSessions";
 import { createWelcomeMessage, WELCOME_MESSAGE_ID } from "@/lib/chatCopy";
+import { looksLikeLiveCheck, type PendingKind } from "@/lib/chatIntent";
 import { saveCheck } from "@/lib/checks";
 import type {
   ChatHistoryItem,
   ThreadMessage,
 } from "@/types/agent";
+
+export interface ChatSendPayload {
+  text: string;
+  imageDataUrl?: string;
+  imageBase64?: string;
+  imageMimeType?: string;
+}
 
 function newId(): string {
   return crypto.randomUUID();
@@ -45,9 +53,11 @@ export function useChatSession() {
   const { user } = useAuth();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ThreadMessage[]>([createWelcomeMessage()]);
-  const [loading, setLoading] = useState(false);
+  const [pendingKind, setPendingKind] = useState<PendingKind>("idle");
   const [error, setError] = useState<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
+
+  const loading = pendingKind !== "idle";
 
   const ensureSession = useCallback(
     async (firstMessage?: string): Promise<string> => {
@@ -55,7 +65,7 @@ export function useChatSession() {
       if (user) {
         const id = await createChatSession(
           user.id,
-          firstMessage?.slice(0, 80) ?? "New check",
+          firstMessage?.slice(0, 80) || "New check",
         );
         setSessionId(id);
         setLocalSessionId(id);
@@ -92,26 +102,42 @@ export function useChatSession() {
   }, [user, bootstrapped]);
 
   const sendMessage = useCallback(
-    async (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed || loading) return;
+    async (payload: ChatSendPayload | string) => {
+      const opts: ChatSendPayload =
+        typeof payload === "string" ? { text: payload } : payload;
+      const trimmed = opts.text.trim();
+      const hasImage = Boolean(opts.imageBase64);
+      if ((!trimmed && !hasImage) || loading) return;
 
-      setLoading(true);
+      const kind: PendingKind = looksLikeLiveCheck(trimmed, hasImage)
+        ? "check"
+        : "reply";
+      setPendingKind(kind);
       setError(null);
+
+      const displayContent =
+        trimmed || (hasImage ? "📷 Screenshot attached" : "");
 
       const userMsg: ThreadMessage = {
         id: newId(),
         role: "user",
-        content: trimmed,
+        content: displayContent,
         messageType: "text",
         createdAt: new Date().toISOString(),
+        imageDataUrl: opts.imageDataUrl,
       };
       setMessages((prev) => [...prev, userMsg]);
 
       try {
-        const sid = await ensureSession(trimmed);
+        const sid = await ensureSession(trimmed || "Screenshot");
         const history = toHistory(messages);
-        const response = await sendChatMessage(trimmed, sid, history);
+        const response = await sendChatMessage({
+          text: trimmed,
+          sessionId: sid,
+          history,
+          imageBase64: opts.imageBase64,
+          imageMimeType: opts.imageMimeType,
+        });
 
         if (response.session_id !== sid) {
           setSessionId(response.session_id);
@@ -133,7 +159,7 @@ export function useChatSession() {
           const persistType =
             response.type === "error" ? "text" : response.type;
           try {
-            await saveChatMessage(sid, "user", trimmed, "text");
+            await saveChatMessage(sid, "user", displayContent, "text");
             await saveChatMessage(
               response.session_id,
               "assistant",
@@ -147,16 +173,19 @@ export function useChatSession() {
         }
 
         if (response.verdict && user) {
-          saveCheck(user.id, response.verdict.agent, trimmed, response.verdict).catch(
-            () => undefined,
-          );
+          saveCheck(
+            user.id,
+            response.verdict.agent,
+            trimmed || displayContent,
+            response.verdict,
+          ).catch(() => undefined);
         }
       } catch (e) {
         setError(
           e instanceof Error ? e.message : "Something went wrong. Try again.",
         );
       } finally {
-        setLoading(false);
+        setPendingKind("idle");
       }
     },
     [loading, messages, ensureSession, user],
@@ -167,6 +196,7 @@ export function useChatSession() {
     localStorage.removeItem("safeline_chat_session_id");
     setMessages([createWelcomeMessage()]);
     setError(null);
+    setPendingKind("idle");
   }, []);
 
   const loadSession = useCallback(
@@ -174,6 +204,7 @@ export function useChatSession() {
       setLocalSessionId(id);
       setSessionId(id);
       setError(null);
+      setPendingKind("idle");
       if (user) {
         try {
           const loaded = await loadChatMessages(id);
@@ -192,6 +223,7 @@ export function useChatSession() {
     sessionId,
     messages,
     loading,
+    pendingKind,
     error,
     sendMessage,
     startNewSession,

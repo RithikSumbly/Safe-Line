@@ -32,8 +32,8 @@ HELP_TEXT = (
     "Worried about a message you received? Maybe a fake bank alert, a job offer "
     "that seems too good to be true, or a rumour about a dam breaking nearby. "
     "We're here to help.\n\n"
-    "Just paste or forward what you got. We'll verify it against live sources "
-    "and send you a clear verdict."
+    "Paste or forward the text, or send a screenshot/photo. We'll read it, "
+    "verify it against live sources, and send you a clear verdict."
 )
 
 LOC_RE = re.compile(r"\b(\d{1,3}\.\d+,\s*\d{1,3}\.\d+)\b")
