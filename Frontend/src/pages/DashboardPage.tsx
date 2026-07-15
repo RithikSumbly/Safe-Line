@@ -93,50 +93,73 @@ export function DashboardPage() {
           </Button>
         </div>
         {phoneMessage && (
-          <p className="mt-2 font-sans text-sm text-ink/60">{phoneMessage}</p>
+          <p
+            className="mt-2 font-sans text-sm text-ink/65"
+            role="status"
+            aria-live="polite"
+          >
+            {phoneMessage}
+          </p>
         )}
       </div>
 
       <div className="mt-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="font-sans text-base font-medium text-ink">
+          <h2 className="font-sans text-base font-medium text-ink" id="past-checks-heading">
             Past checks
           </h2>
-          <Select
-            value={filter}
-            onValueChange={(v) => setFilter(v as AgentType | "all")}
-          >
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue placeholder="Filter by type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All checkers</SelectItem>
-              {(Object.keys(AGENT_LABELS) as AgentType[]).map((a) => (
-                <SelectItem key={a} value={a}>
-                  {AGENT_LABELS[a]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="check-filter" className="sr-only">
+              Filter checks by type
+            </label>
+            <Select
+              value={filter}
+              onValueChange={(v) => setFilter(v as AgentType | "all")}
+            >
+              <SelectTrigger id="check-filter" className="w-full sm:w-[200px]" aria-labelledby="past-checks-heading">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All checkers</SelectItem>
+                {(Object.keys(AGENT_LABELS) as AgentType[]).map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {AGENT_LABELS[a]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="mt-4 overflow-x-auto border border-line rounded-[10px]">
           {loading ? (
-            <p className="px-4 py-8 font-sans text-sm text-ink/60">
+            <p className="px-4 py-8 font-sans text-sm text-ink/65" role="status">
               Loading check history…
             </p>
           ) : rows.length === 0 ? (
-            <p className="px-4 py-8 font-sans text-sm text-ink/60">
+            <p className="px-4 py-8 font-sans text-sm text-ink/65">
               No checks saved yet. Use a checker tool while signed in.
             </p>
           ) : (
             <table className="w-full min-w-[480px] text-left text-sm">
+              <caption className="sr-only">
+                Saved SafeLine checks with input, type, verdict, and date
+              </caption>
               <thead>
                 <tr className="border-b border-line">
-                  <th className="px-4 py-3 font-sans font-medium text-ink">Input</th>
-                  <th className="px-4 py-3 font-sans font-medium text-ink">Type</th>
-                  <th className="px-4 py-3 font-sans font-medium text-ink">Verdict</th>
-                  <th className="px-4 py-3 font-mono text-xs font-medium text-ink/60">
+                  <th scope="col" className="px-4 py-3 font-sans font-medium text-ink">
+                    Input
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-sans font-medium text-ink">
+                    Type
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-sans font-medium text-ink">
+                    Verdict
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-3 font-mono text-xs font-medium text-ink/65"
+                  >
                     Date
                   </th>
                 </tr>
@@ -163,7 +186,7 @@ export function DashboardPage() {
                         {STATUS_STAMP[row.verdict.status].label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-ink/40">
+                    <td className="px-4 py-3 font-mono text-xs text-ink/55">
                       {new Date(row.created_at).toLocaleDateString()}
                     </td>
                   </tr>

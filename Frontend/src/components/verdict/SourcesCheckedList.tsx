@@ -19,7 +19,7 @@ export function SourcesCheckedList({
 }: SourcesCheckedListProps) {
   return (
     <div className={className}>
-      <h3 className="kicker mb-4">Sources checked</h3>
+      <p className="kicker mb-4">Sources checked</p>
       <ol className="space-y-4">
         {evidence.map((item, i) => (
           <li

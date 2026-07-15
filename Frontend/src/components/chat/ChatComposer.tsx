@@ -88,9 +88,10 @@ export function ChatComposer({
         "shrink-0 border-t border-[var(--chat-border)] p-4",
         className,
       )}
+      aria-label="Compose message"
     >
       {urls.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-2">
+        <div className="mb-3 flex flex-wrap gap-2" aria-label="Detected links">
           {urls.map((url) => (
             <span
               key={url}
@@ -112,26 +113,31 @@ export function ChatComposer({
             <button
               type="button"
               onClick={() => setImage(null)}
-              className="absolute right-1 top-1 rounded bg-ink/80 px-1.5 py-0.5 font-mono text-[10px] text-paper"
+              className="a11y-control absolute right-1 top-1 rounded bg-ink/80 px-2 py-1 font-mono text-[10px] text-paper"
               aria-label="Remove screenshot"
             >
               ✕
             </button>
           </div>
-          <p className="font-mono text-[10px] text-ink/45">
+          <p className="font-mono text-[10px] text-ink/55" id="compose-image-hint">
             Screenshot ready — we will read the text and check it.
           </p>
         </div>
       )}
       {attachError && (
-        <p className="mb-2 font-sans text-xs text-risk">{attachError}</p>
+        <p className="mb-2 font-sans text-xs text-risk" role="alert" id="compose-attach-error">
+          {attachError}
+        </p>
       )}
       <div className="flex items-end gap-2">
         <input
           ref={fileInputRef}
+          id="chat-screenshot-input"
           type="file"
           accept="image/png,image/jpeg,image/webp,image/gif"
-          className="hidden"
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) void attachFile(file);
@@ -142,7 +148,7 @@ export function ChatComposer({
           type="button"
           disabled={loading}
           onClick={() => fileInputRef.current?.click()}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] border border-[var(--chat-border)] bg-[var(--chat-panel-bg)] text-ink/70 transition-colors hover:border-ink/30 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+          className="a11y-control inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] border border-[var(--chat-border)] bg-[var(--chat-panel-bg)] text-ink/70 transition-colors hover:border-ink/30 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
           aria-label="Attach screenshot"
           title="Attach screenshot"
         >
@@ -160,12 +166,21 @@ export function ChatComposer({
             <path d="M21 15l-5-5L5 19" />
           </svg>
         </button>
+        <label htmlFor="chat-message-input" className="sr-only">
+          Message to check
+        </label>
         <Textarea
+          id="chat-message-input"
           ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Paste a message or screenshot…"
           rows={2}
+          aria-describedby={
+            [attachError ? "compose-attach-error" : null, image ? "compose-image-hint" : null, "compose-hints"]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
           className="min-h-[48px] flex-1 resize-none border-[var(--chat-border)] bg-[var(--chat-panel-bg)] py-2.5 focus:border-[var(--color-cta)] focus:outline-none focus:ring-2 focus:ring-[var(--color-cta)] focus:ring-offset-1"
           onPaste={(e) => {
             const items = e.clipboardData?.items;
@@ -190,14 +205,14 @@ export function ChatComposer({
           type="submit"
           disabled={!canSend}
           className={cn(
-            "btn-cta inline-flex h-10 shrink-0 items-center justify-center rounded-[6px] px-4 font-sans text-sm font-medium transition-colors",
+            "btn-cta a11y-control inline-flex h-11 shrink-0 items-center justify-center rounded-[6px] px-4 font-sans text-sm font-medium transition-colors",
             !canSend && "cursor-not-allowed",
           )}
         >
           {buttonLabel}
         </button>
       </div>
-      <p className="mt-2 font-mono text-[10px] text-ink/40">
+      <p id="compose-hints" className="mt-2 font-mono text-[10px] text-ink/70">
         Enter to send · Shift+Enter for new line · Paste or attach a screenshot
       </p>
     </form>

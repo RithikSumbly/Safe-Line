@@ -34,7 +34,7 @@ export function AnnotatedMessageBlock({
 
   return (
     <div className={className}>
-      <h3 className="kicker mb-2">Your message</h3>
+      <p className="kicker mb-2">Your message</p>
       {showHighlights && (
         <p className="mb-2 font-mono text-[10px] text-ink/45">
           Underlined phrases match the issues listed below (¹, ², ³…).

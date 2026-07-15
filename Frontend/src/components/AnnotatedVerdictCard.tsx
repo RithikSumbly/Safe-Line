@@ -155,7 +155,7 @@ export function AnnotatedVerdictCard({
 
         {verdict.explanation && (
           <div className="mb-6 pr-16">
-            <h3 className="kicker mb-2">Summary</h3>
+            <h2 className="kicker mb-2">Summary</h2>
             <p className="font-sans text-sm leading-relaxed text-ink">
               {verdict.explanation}
             </p>
@@ -173,13 +173,13 @@ export function AnnotatedVerdictCard({
 
         {verdict.red_flags.length > 0 && (
           <div className="mb-6 border-t border-line pt-6">
-            <h3 className="kicker mb-4">
+            <h2 className="kicker mb-4">
               {verdict.status === "likely_false" || verdict.status === "high_risk"
                 ? "Why we flagged this"
                 : verdict.status === "unverified"
                   ? "What we could not verify"
                   : "Key findings"}
-            </h3>
+            </h2>
             <ol className="space-y-3">
               {verdict.red_flags.map((flag, i) => (
                 <li
@@ -252,7 +252,7 @@ export function AnnotatedVerdictCard({
             stamp.color === "pending" && "border-l-pending bg-pending/[0.06]",
           )}
         >
-          <h3 className="kicker mb-3">What to do next</h3>
+          <h2 className="kicker mb-3">What to do next</h2>
           {nextSteps.length > 1 ? (
             <ol className="list-decimal space-y-2 pl-4 font-sans text-sm font-medium text-ink">
               {nextSteps.map((step, i) => (
@@ -269,7 +269,7 @@ export function AnnotatedVerdictCard({
         {verdict.agent === "scam" && familyRewrite && (
           <div className="mb-6 border-t border-line pt-6 pr-16">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="kicker">Message for family</h3>
+              <h2 className="kicker">Message for family</h2>
               <button
                 type="button"
                 onClick={() => void copyFamilyMessage()}

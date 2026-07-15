@@ -34,13 +34,21 @@ export function CheckingSourcesLoader({ className }: CheckingSourcesLoaderProps)
       aria-live="polite"
     >
       <p className="font-mono text-sm text-ink">{LOADING_PHRASES[index]}</p>
-      <div className="h-1 w-full overflow-hidden bg-line">
+      <div
+        className="h-1 w-full overflow-hidden bg-line"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progress}
+        aria-label="Check progress"
+      >
         <div
           className="h-full bg-alive transition-[width] duration-300 ease-out motion-reduce:transition-none"
           style={{ width: `${progress}%` }}
+          aria-hidden
         />
       </div>
-      <p className="font-mono text-xs text-ink/40">
+      <p className="font-mono text-xs text-ink/55">
         {new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",

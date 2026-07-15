@@ -69,15 +69,16 @@ export function AboutPage() {
           <h2 className="font-display text-xl font-semibold text-ink">
             Report fraud and get help
           </h2>
-          <ul className="mt-3 space-y-2 font-mono text-sm text-ink/70">
+          <ul className="mt-3 space-y-2 font-mono text-sm text-ink/75">
             <li>
               <a
                 href="https://cybercrime.gov.in"
-                className="text-verified hover:underline"
+                className="font-medium text-ink underline underline-offset-2"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 cybercrime.gov.in
+                <span className="sr-only"> (opens in a new tab)</span>
               </a>{" "}
               — National Cyber Crime Reporting Portal
             </li>
@@ -88,11 +89,12 @@ export function AboutPage() {
             <li>
               <a
                 href="https://nalsa.gov.in"
-                className="text-verified hover:underline"
+                className="font-medium text-ink underline underline-offset-2"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 nalsa.gov.in
+                <span className="sr-only"> (opens in a new tab)</span>
               </a>{" "}
               — NALSA legal aid (15100)
             </li>

@@ -7,7 +7,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <p className="mx-auto max-w-6xl px-4 py-20 font-sans text-sm text-ink/60">
+      <p
+        className="mx-auto max-w-6xl px-4 py-20 font-sans text-sm text-ink/65"
+        role="status"
+        aria-live="polite"
+      >
         Loading your account…
       </p>
     );

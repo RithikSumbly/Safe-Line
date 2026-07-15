@@ -43,7 +43,10 @@ export function SignInPage() {
         <h1 className="font-display text-2xl font-semibold text-ink">Sign in</h1>
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">
+              Email <span className="text-risk" aria-hidden>*</span>
+              <span className="sr-only">(required)</span>
+            </Label>
             <Input
               id="email"
               type="email"
@@ -51,14 +54,19 @@ export function SignInPage() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              aria-invalid={Boolean(error) || undefined}
+              aria-describedby={error ? "signin-error" : undefined}
             />
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">
+                Password <span className="text-risk" aria-hidden>*</span>
+                <span className="sr-only">(required)</span>
+              </Label>
               <Link
                 to="/forgot-password"
-                className="font-sans text-xs text-ink/60 underline underline-offset-2 hover:text-ink"
+                className="font-sans text-xs font-medium text-ink/80 underline underline-offset-2 hover:text-ink"
               >
                 Forgot password?
               </Link>
@@ -70,21 +78,27 @@ export function SignInPage() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              aria-invalid={Boolean(error) || undefined}
+              aria-describedby={error ? "signin-error" : undefined}
             />
           </div>
-          {error && <p className="font-sans text-sm text-risk">{error}</p>}
+          {error && (
+            <p id="signin-error" className="font-sans text-sm text-risk" role="alert">
+              {error}
+            </p>
+          )}
           <Button type="submit" className="w-full" disabled={submitting}>
             Sign in
           </Button>
         </form>
-        <p className="mt-6 text-center font-sans text-sm text-ink/60">
+        <p className="mt-6 text-center font-sans text-sm text-ink/75">
           No account?{" "}
-          <Link to="/sign-up" className="text-ink underline underline-offset-2">
+          <Link to="/sign-up" className="font-medium text-ink underline underline-offset-2">
             Sign up
           </Link>
         </p>
         <p className="mt-4 text-center">
-          <Link to="/" className="font-sans text-sm text-ink/60 hover:text-ink">
+          <Link to="/" className="font-sans text-sm font-medium text-ink/80 underline underline-offset-2 hover:text-ink">
             Back to home
           </Link>
         </p>

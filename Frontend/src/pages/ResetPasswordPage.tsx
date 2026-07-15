@@ -103,7 +103,11 @@ export function ResetPasswordPage() {
               onChange={(e) => setConfirm(e.target.value)}
             />
           </div>
-          {error && <p className="font-sans text-sm text-risk">{error}</p>}
+          {error && (
+            <p className="font-sans text-sm text-risk" role="alert" id="reset-error">
+              {error}
+            </p>
+          )}
           <Button type="submit" className="w-full" disabled={submitting}>
             Update password
           </Button>

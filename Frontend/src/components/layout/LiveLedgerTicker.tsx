@@ -56,7 +56,8 @@ function FeedRow({
           className={cn("h-1.5 w-1.5 shrink-0 rounded-full", DOT[item.severity])}
           aria-hidden
         />
-        <span className="font-mono text-[9px] uppercase tracking-wider text-ink/35">
+        <span className="sr-only">{item.severity} status. </span>
+        <span className="font-mono text-[9px] uppercase tracking-wider text-ink/55">
           {formatAgo(item.minutesAgo)}
         </span>
       </div>
@@ -122,8 +123,9 @@ export function LiveLedgerTicker() {
           <button
             type="button"
             onClick={toggleCollapsed}
-            className="flex flex-col items-center gap-3 rounded-[6px] p-2 text-ink/45 transition-colors hover:bg-ink/[0.04] hover:text-ink"
+            className="a11y-control flex min-h-11 flex-col items-center gap-3 rounded-[6px] p-2 text-ink/55 transition-colors hover:bg-ink/[0.04] hover:text-ink"
             aria-label="Expand live ledger"
+            aria-expanded={false}
             title="Live ledger"
           >
             <span className="relative flex h-2 w-2" aria-hidden>
@@ -162,8 +164,9 @@ export function LiveLedgerTicker() {
             <button
               type="button"
               onClick={toggleCollapsed}
-              className="rounded p-1 text-ink/40 hover:bg-ink/5 hover:text-ink"
+              className="a11y-control rounded p-2 text-ink/55 hover:bg-ink/5 hover:text-ink"
               aria-label="Collapse live ledger"
+              aria-expanded={true}
             >
               <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
             </button>

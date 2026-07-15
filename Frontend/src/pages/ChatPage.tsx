@@ -58,7 +58,7 @@ export function ChatPage() {
             <h1 className="font-display text-xl text-ink md:text-2xl">
               SafeLine chat
             </h1>
-            <p className="mt-1 font-sans text-sm text-ink/55">{CHAT_TAGLINE}</p>
+            <p className="mt-1 font-sans text-sm text-ink/70">{CHAT_TAGLINE}</p>
           </div>
         </div>
       </header>
@@ -76,22 +76,29 @@ export function ChatPage() {
             onNew={handleNewSession}
           />
           <div className="flex min-w-0 flex-1 flex-col">
-            <ChatThread
-              messages={messages}
-              loading={loading}
-              pendingKind={pendingKind}
-              onOpenReport={handleOpenReport}
-            />
+            <section className="flex min-h-0 flex-1 flex-col" aria-label="Conversation">
+              <ChatThread
+                messages={messages}
+                loading={loading}
+                pendingKind={pendingKind}
+                onOpenReport={handleOpenReport}
+              />
+            </section>
             {error && (
-              <p className="shrink-0 border-t border-risk/20 bg-risk/[0.05] px-4 py-2 font-sans text-sm text-risk">
+              <p
+                className="shrink-0 border-t border-risk/20 bg-risk/[0.05] px-4 py-2 font-sans text-sm text-risk"
+                role="alert"
+              >
                 {error}
               </p>
             )}
-            <ChatComposer
-              onSend={sendMessage}
-              loading={loading}
-              pendingKind={pendingKind}
-            />
+            <section aria-label="Message composer">
+              <ChatComposer
+                onSend={sendMessage}
+                loading={loading}
+                pendingKind={pendingKind}
+              />
+            </section>
           </div>
         </div>
       </div>

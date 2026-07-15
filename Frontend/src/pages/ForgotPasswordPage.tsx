@@ -45,14 +45,22 @@ export function ForgotPasswordPage() {
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
-          {error && <p className="font-sans text-sm text-risk">{error}</p>}
-          {message && <p className="font-sans text-sm text-ink/70">{message}</p>}
+          {error && (
+            <p className="font-sans text-sm text-risk" role="alert" id="forgot-error">
+              {error}
+            </p>
+          )}
+          {message && (
+            <p className="font-sans text-sm text-ink/70" role="status">
+              {message}
+            </p>
+          )}
           <Button type="submit" className="w-full" disabled={submitting}>
             Send reset link
           </Button>
         </form>
-        <p className="mt-6 text-center font-sans text-sm text-ink/60">
-          <Link to="/sign-in" className="text-ink underline underline-offset-2">
+        <p className="mt-6 text-center font-sans text-sm text-ink/75">
+          <Link to="/sign-in" className="font-medium text-ink underline underline-offset-2">
             Back to sign in
           </Link>
         </p>

@@ -56,9 +56,9 @@ export function RecentChecksStrip({ className }: RecentChecksStripProps) {
 
   return (
     <div className={cn("border-t border-line pt-6", className)}>
-      <h3 className="mb-4 font-display text-lg font-semibold text-ink">
+      <h2 className="mb-4 font-display text-lg font-semibold text-ink">
         Recent checks
-      </h3>
+      </h2>
       <ul className="divide-y divide-line border border-line rounded-[10px]">
         {checks.map((check) => (
           <li

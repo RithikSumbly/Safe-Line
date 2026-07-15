@@ -43,7 +43,7 @@ html:not([data-theme]) {
   --chat-panel-bg: #f5f7f6;
   --chat-border: #d8d5cc;
   --chat-send-disabled-bg: #d8d5cc;
-  --chat-send-disabled-text: #8a9199;
+  --chat-send-disabled-text: #5c636b;
   --nav-active-fill: color-mix(in srgb, var(--color-alive) 18%, var(--color-paper));
 }
 
@@ -100,11 +100,128 @@ html[data-theme="coffee"] {
   }
 
   :focus-visible {
-    @apply outline-none ring-2 ring-ink/30 ring-offset-2 ring-offset-paper;
+    outline: 2px solid color-mix(in srgb, var(--color-ink) 55%, transparent);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--color-paper);
+  }
+
+  /* Prefer visible focus without mouse-click flash */
+  :focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
   }
 }
 
+/* —— Accessibility mode (opt-in: Default vs Accessibility) —— */
+html[data-a11y="accessibility"] {
+  --color-ink: #121c2b;
+  --color-paper: #f7f8f7;
+  --color-line: #8a9088;
+  --color-verified: #145a4a;
+  --color-risk: #9a2f25;
+  --color-pending: #8a6418;
+  --color-cta: #145a4a;
+  --color-cta-hover: #0f4639;
+  --chat-send-disabled-text: #5c636b;
+  --chat-border: #8a9088;
+  font-size: 112.5%;
+  letter-spacing: 0.02em;
+  --font-sans: "Atkinson Hyperlegible", "IBM Plex Sans", sans-serif;
+  --font-display: "Atkinson Hyperlegible", "Fraunces", Georgia, serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+html[data-a11y="accessibility"][data-theme="coffee"] {
+  --color-ink: #1a0f0a;
+  --color-paper: #fffaf2;
+  --color-line: #8b7355;
+  --color-verified: #5c4028;
+  --color-risk: #a33a28;
+  --color-pending: #8a5a28;
+  --color-cta: #145a4a;
+  --color-cta-hover: #0f4639;
+  --chat-border: #8b7355;
+  --chat-send-disabled-text: #5c5348;
+}
+
+html[data-a11y="accessibility"] body {
+  line-height: 1.65;
+  letter-spacing: 0.02em;
+}
+
+html[data-a11y="accessibility"] :focus-visible {
+  outline: 3px solid var(--color-ink);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px var(--color-paper), 0 0 0 6px var(--color-alive);
+}
+
+html[data-a11y="accessibility"] a:not([class*="btn"]):not([role="button"]) {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  font-weight: 600;
+}
+
+html[data-a11y="accessibility"] .a11y-control,
+html[data-a11y="accessibility"] button:not([disabled]),
+html[data-a11y="accessibility"] a[href],
+html[data-a11y="accessibility"] [role="button"],
+html[data-a11y="accessibility"] input,
+html[data-a11y="accessibility"] select,
+html[data-a11y="accessibility"] textarea {
+  min-height: 2.75rem;
+}
+
+html[data-a11y="accessibility"] .text-ink\/40,
+html[data-a11y="accessibility"] .text-ink\/45,
+html[data-a11y="accessibility"] .text-ink\/50,
+html[data-a11y="accessibility"] .text-ink\/55 {
+  color: color-mix(in srgb, var(--color-ink) 78%, transparent) !important;
+}
+
+html[data-a11y="accessibility"] *,
+html[data-a11y="accessibility"] *::before,
+html[data-a11y="accessibility"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
 @layer utilities {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .skip-link {
+    position: absolute;
+    left: 1rem;
+    top: 0;
+    z-index: 100;
+    transform: translateY(-120%);
+    border-radius: 6px;
+    border: 2px solid var(--color-ink);
+    background: var(--color-paper);
+    padding: 0.65rem 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+
+  .skip-link:focus {
+    transform: translateY(0.75rem);
+    outline: 3px solid var(--color-verified);
+    outline-offset: 2px;
+  }
+
   .stamp-grain {
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
   }

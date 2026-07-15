@@ -22,14 +22,14 @@ export function StatsStrip({ className }: StatsStripProps) {
     >
       <div className="content-shell">
         <div className="flex flex-wrap items-baseline justify-center gap-x-10 gap-y-3 text-center md:justify-start md:text-left">
-          <p className="font-mono text-xs uppercase tracking-wider text-ink/50">
+          <p className="font-mono text-xs uppercase tracking-wider text-ink/70">
             <span className="font-display text-2xl font-semibold tabular-nums text-ink">
               {messages.toLocaleString("en-IN")}
             </span>{" "}
             messages checked
           </p>
           <span className="hidden h-4 w-px bg-line md:block" aria-hidden />
-          <p className="font-mono text-xs uppercase tracking-wider text-ink/50">
+          <p className="font-mono text-xs uppercase tracking-wider text-ink/70">
             <span className="font-display text-2xl font-semibold tabular-nums text-risk">
               {scams.toLocaleString("en-IN")}
             </span>{" "}
